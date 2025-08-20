@@ -34,5 +34,4 @@ EXPOSE 8080
 
 # Gunicorn en forma JSON (mejor manejo de señales)
 CMD ["gunicorn", "prototipo_convenios_vacaciones_app:create_app()", \
-    "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "120"]
-
+    "--bind", "0.0.0.0:${PORT}", "--workers", "2", "--threads", "4", "--timeout", "120"]

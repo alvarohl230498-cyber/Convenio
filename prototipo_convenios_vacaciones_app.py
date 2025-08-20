@@ -4,11 +4,14 @@ from datetime import datetime, date, timedelta
 from io import BytesIO
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash,make_response, Blueprint, abort,jsonify
 from flask_sqlalchemy import SQLAlchemy
-from weasyprint import HTML
 from calendar import monthrange
 from reportlab.pdfgen import canvas
 import locale
 from urllib.parse import urlparse
+from .models import db  # tu import normal de SQLAlchemy
+from .utils import normalize_db_url  # lo que ya usas
+
+
 
 
 
@@ -121,6 +124,16 @@ def create_app():
     @app.get("/health")
     def health():
         return {"status": "ok"}, 200
+
+    @app.route("/generar_convenio/<int:id>")
+    def generar_convenio(id):
+        # 👇 Importa WeasyPrint SOLO aquí
+        from weasyprint import HTML
+
+        convenio = db.session.get(Convenio, id)
+        html_content = render_template("convenio.html", convenio=convenio)
+        pdf = HTML(string=html_content).write_pdf()
+        return Response(pdf, mimetype="application/pdf")
 
     with app.app_context():
         db.create_all()
