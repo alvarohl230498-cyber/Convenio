@@ -3,9 +3,8 @@ FROM python:3.11-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PORT=8080
+    PYTHONPATH=/app
 
-# Librerías del sistema necesarias para WeasyPrint + Postgres
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libcairo2 \
@@ -19,20 +18,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Dependencias Python
 COPY requirements.txt /app/
-RUN pip install -r requirements.txt
+RUN python -m pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
 
-# Código
 COPY . /app
 
-# Usuario no-root
 RUN useradd -m appuser
 USER appuser
 
-# (opcional) puedes quitar EXPOSE; Render no lo usa
-# EXPOSE 8080
-
-# Usa shell para expandir $PORT que Render inyecta en runtime
 CMD bash -lc 'gunicorn "prototipo_convenios_vacaciones_app:create_app()" \
     --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120'
