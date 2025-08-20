@@ -30,8 +30,9 @@ COPY . /app
 RUN useradd -m appuser
 USER appuser
 
-EXPOSE 8080
+# (opcional) puedes quitar EXPOSE; Render no lo usa
+# EXPOSE 8080
 
-# Gunicorn en forma JSON (mejor manejo de señales)
-CMD ["gunicorn", "prototipo_convenios_vacaciones_app:create_app()", \
-    "--bind", "0.0.0.0:${PORT}", "--workers", "2", "--threads", "4", "--timeout", "120"]
+# Usa shell para expandir $PORT que Render inyecta en runtime
+CMD bash -lc 'gunicorn "prototipo_convenios_vacaciones_app:create_app()" \
+    --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120'
