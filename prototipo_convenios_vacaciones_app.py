@@ -430,16 +430,15 @@ def solicitar_vacaciones(empleado_id):
         db.session.add(conv)
         db.session.flush()
 
-        # Identifica P1/P2 consecutivos desde la fecha de ingreso
-        p1_str, p1_inicio, p1_fin = periodo_from_ingreso(e.fecha_ingreso, 1)
-        p2_str, p2_inicio, p2_fin = periodo_from_ingreso(e.fecha_ingreso, 2)
-        p1_db = PeriodoVacacional.query.filter_by(id_empleado=e.id, periodo=p1_str).first()
-        p2_db = PeriodoVacacional.query.filter_by(id_empleado=e.id, periodo=p2_str).first()
+        decision = validar_solicitud(e, inicio, fin, periodo_forzado=periodo)
+        p1_db = decision.get('periodo_base')         # Periodo base (P1) ya determinado
+        p2_db = decision.get('periodo_acumulado')    # Segundo periodo (P2) si aplica
 
-        # Prorrateo: primero consume P1; resto contra P2
-        p1_disponibles = max(0, (p1_db.dias_pendientes if p1_db and p1_db.dias_pendientes is not None else 0))
+        # Prorrateo: primero consume P1; el resto va contra P2
+        p1_disponibles = max(0, (p1_db.dias_pendientes or 0)) if p1_db else 0
         dias_p1 = min(dias, p1_disponibles)
         dias_p2 = max(0, dias - dias_p1)
+
 
         if p1_db and dias_p1 > 0:
             p1_db.dias_pendientes = max(0, (p1_db.dias_pendientes or 0) - dias_p1)
