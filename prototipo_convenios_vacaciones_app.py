@@ -8,8 +8,8 @@ from calendar import monthrange
 from reportlab.pdfgen import canvas
 import locale
 from urllib.parse import urlparse
-from .models import db, Convenio  # tu import normal de SQLAlchemy
-from .utils import normalize_db_url  # lo que ya usas
+from models import db, Convenio  # tu import normal de SQLAlchemy
+from utils import normalize_db_url  # lo que ya usas
 
 
 
