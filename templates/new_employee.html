@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">➕ Crear Nuevo Colaborador</h2>
+    <form method="POST" action="{{ url_for('new_employee') }}" class="p-4 border rounded shadow-sm bg-light">
+
+        <div class="mb-3">
+            <label for="dni" class="form-label">DNI</label>
+            <input type="text" class="form-control text-uppercase" id="dni" name="dni" maxlength="12" required
+                oninput="this.value = this.value.toUpperCase();">
+        </div>
+
+        <div class="mb-3">
+            <label for="nombre" class="form-label">Nombre completo</label>
+            <input type="text" class="form-control text-uppercase" id="nombre" name="nombre" required
+                oninput="this.value = this.value.toUpperCase();">
+        </div>
+
+        <div class="mb-3">
+            <label for="cargo" class="form-label">Cargo</label>
+            <input type="text" class="form-control text-uppercase" id="cargo" name="cargo"
+                oninput="this.value = this.value.toUpperCase();">
+        </div>
+
+        <div class="mb-3">
+            <label for="direccion" class="form-label">Dirección</label>
+            <input type="text" class="form-control text-uppercase" id="direccion" name="direccion"
+                oninput="this.value = this.value.toUpperCase();">
+        </div>
+
+        <div class="mb-3">
+            <label for="fecha_ingreso" class="form-label">Fecha de ingreso</label>
+            <input type="date" class="form-control" id="fecha_ingreso" name="fecha_ingreso" required>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">⬅ Volver</a>
+            <button type="submit" class="btn btn-primary">💾 Guardar Colaborador</button>
+        </div>
+    </form>
+</div>
+
+<style>
+    .text-uppercase {
+        text-transform: uppercase;
+    }
+</style>
+{% endblock %}

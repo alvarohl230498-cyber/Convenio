@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <title>Convenio de Acumulación de Vacaciones</title>
+    <style>
+        /* Márgenes reales del PDF (impresión) */
+        @page {
+            size: A4;
+            margin: 2.5cm 3cm;
+        }
+
+        /* === Estilo (frontend) === */
+        body {
+            font-family: DejaVu Sans, Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            /* SIN margen aquí: ya lo maneja @page */
+            line-height: 1.5;
+            /* ← Interlineado ajustado */
+            color: #111;
+            text-align: justify;
+            hyphens: auto;
+            word-break: normal;
+            overflow-wrap: break-word;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 14px;
+            margin: 0 0 10px;
+        }
+
+        h2 {
+            font-size: 12px;
+            margin: 12px 0 6px;
+        }
+
+        .header {
+            text-align: justify;
+        }
+
+        .block {
+            margin: 10px 0;
+        }
+
+        .firma {
+            margin-top: 80px;
+        }
+
+        .two-col {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        .datos {
+            margin-bottom: 10px;
+        }
+
+        ul {
+            margin: 6px 0 6px 18px;
+            padding: 0;
+        }
+
+        li {
+            margin: 3px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        td,
+        th {
+            padding: 6px;
+            vertical-align: top;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>CONVENIO DE ACUMULACIÓN DE VACACIONES</h1>
+
+    <div class="block header">
+        Conste por el presente documento el <b>CONVENIO DE ACUMULACIÓN DE VACACIONES</b>, que suscriben al amparo del
+        Artículo 18° del Decreto Legislativo N° 713 y normas complementarias, de una parte, la empresa
+        <b>{{ empresa.razon_social }}</b>, identificada con <b>RUC N° {{ empresa.ruc }}</b>, representada por su
+        <b>Gerente General, Señor {{ empresa.rep_nombre }}</b>, identificado con <b>DNI N° {{ empresa.rep_dni }}</b>,
+        con
+        dirección domiciliaria para estos efectos en <b>{{ empresa.direccion }}</b>, a quien en adelante se le
+        denominará
+        <b>EL EMPLEADOR</b>, y de la otra parte el(la) Señor(a) <b>{{ empleado.nombre }}</b>, identificado(a) con
+        <b>DNI N° {{ empleado.dni }}</b>, con dirección domiciliaria para estos efectos en
+        <b>{{ empleado.direccion }}</b>, a quien en adelante se le denominará <b>EL TRABAJADOR</b>, en los términos y
+        condiciones siguientes:
+    </div>
+
+    <h2>PRIMERA: ANTECEDENTES</h2>
+    <div class="block">
+        EL TRABAJADOR viene prestando servicios para EL EMPLEADOR desde el
+        <b>{{ fecha_literal(empleado.fecha_ingreso) }}</b>, desempeñándose a la fecha como
+        <b>{{ empleado.cargo }}</b>.
+    </div>
+
+    <h2>SEGUNDA: OBJETO DEL CONVENIO</h2>
+    <div class="block">
+        De conformidad con lo previsto en el Artículo 18° del Decreto Legislativo Nº 713, EL TRABAJADOR y EL EMPLEADOR
+        acuerdan que EL TRABAJADOR acumulará dos descansos vacacionales consecutivos.
+    </div>
+
+    <div class="block">
+        En este sentido, los periodos de descanso vacacional a acumular son los siguientes:
+    </div>
+
+    <div class="block">
+        1) <b>PRIMER PERIODO VACACIONAL (GENERADO):</b> Del <b>{{ fecha_literal(p1.inicio) }}</b> al
+        <b>{{ fecha_literal(p1.fin) }}</b>.<br>
+        2) <b>SEGUNDO PERIODO VACACIONAL (POR GENERARSE):</b> Del <b>{{ fecha_literal(p2.inicio) }}</b> al
+        <b>{{ fecha_literal(p2.fin) }}</b>.
+    </div>
+
+    <div class="block">
+        En este sentido, los <b>sesenta (60) días</b> de descanso vacacional acumulado, serán contabilizados de la
+        siguiente forma:
+    </div>
+
+    {% if p1 %}
+    <div class="block">
+        <b>a. PRIMER PERIODO DE DESCANSO: {{ numero_a_letras(p1.total)|capitalize }} ({{ p1.total }}) DIAS</b>, de la
+        siguiente forma:
+        <ul>
+            {% for b in p1.bloques %}
+            <li>
+                <b>{{ numero_a_letras(b.dias)|capitalize }} ({{ b.dias }}) DIAS</b>, correspondientes al periodo
+                vacacional
+                {{ b.periodo }}; dejándose expresa constancia que, de este periodo de descanso, {{ b.verbo }} en las
+                fechas del
+                <b>{{ b.inicio.strftime('%d/%m/%Y') }}</b> al <b>{{ b.fin.strftime('%d/%m/%Y') }}</b>.
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="block">
+        <b>b. SEGUNDO PERIODO DE DESCANSO: {{ p2.total|num_es|capitalize }} ({{ p2.total }}) DIAS</b>, de la siguiente
+        forma:
+        <ul>
+            <li>
+                <b>{{ p2.remanentes_p1|num_es|capitalize }} ({{ p2.remanentes_p1 }}) DÍAS</b>: correspondientes al
+                periodo vacacional {{ p1.periodo }}, serán gozados hasta el
+                <b>{{ fecha_literal(p2.ventana_p1_hasta) }}</b> (como fecha máxima); dejándose expresa constancia que
+                este
+                periodo de descanso se hará efectivo dentro del plazo previsto en el <b>Art.23° del Decreto Legislativo
+                    N° 713</b>.
+            </li>
+            <li>
+                <b>{{ p2.dias_p2|num_es|capitalize }} ({{ p2.dias_p2 }}) DÍAS</b>: correspondientes al periodo
+                vacacional
+                {{ p2.periodo }}, serán gozados entre el <b>{{ fecha_literal(p2.ventana_p2_desde) }}</b> al
+                <b>{{ fecha_literal(p2.ventana_p2_hasta) }}</b>; dejándose expresa constancia que este periodo de
+                descanso se
+                hará efectivo dentro del plazo previsto en el <b>Art.23º del Decreto Legislativo Nº 713</b>.
+            </li>
+        </ul>
+    </div>
+
+    <h2>TERCERA: PERIODO VACACIONAL ACUMULABLE</h2>
+    <div class="block">
+        En virtud del presente Convenio EL EMPLEADOR y EL TRABAJADOR acuerdan que éste acumule
+        <b>{{ p2.remanentes_p1|num_es }} ({{ p2.remanentes_p1 }})</b> días pendientes de goce del
+        <b>PRIMER PERIODO VACACIONAL YA GENERADO (CLÁUSULA SEGUNDA, NUMERAL 1º)</b>, con los
+        <b>{{ p2.dias_p2|num_es }} ({{ p2.dias_p2 }})</b> de vacaciones del
+        <b>SEGUNDO PERIODO VACACIONAL POR GENERARSE (CLÁUSULA SEGUNDA, NUMERAL 2º)</b>.
+    </div>
+
+    <div class="block">
+        Las partes dejan constancia que suscriben el presente convenio en forma libre y voluntaria, sin la existencia de
+        dolo, error, amenaza, presión, coacción o cualquier otro vicio de la voluntad en contra del TRABAJADOR.
+    </div>
+
+    <div class="block firma">
+        Firmado en <b>{{ empresa.lugar_firma }}</b>, <b>{{ firma.fecha_larga }}</b>, entregándose un ejemplar a cada una
+        de
+        las partes.
+    </div>
+
+    <div class="block" style="margin-top: 30px;">
+        <table>
+            <tr>
+                <!-- EMPLEADOR -->
+                <td align="center" style="padding:0 12px; vertical-align:top;">
+                    <div style="width:240px; margin:0 auto; text-align:center;">
+                        <!-- Firma centrada -->
+                        <div style="height:110px;">
+                            <img src="{{ url_for('static', filename='imagenes/firma_de_francisco.png') }}"
+                                alt="Firma EMPLEADOR"
+                                style="max-height:100px; width:auto; display:block; margin:0 auto;">
+                        </div>
+                        <!-- Línea bajo la firma (mismo ancho del contenedor) -->
+                        <div style="width:240px; border-top:2px solid #222; margin:8px auto 6px;"></div>
+
+                        <div style="font-weight:700;">{{ empresa.rep_nombre }}</div>
+                        <div>DNI N.° {{ empresa.rep_dni }}</div>
+                        <div style="font-weight:700;">EMPLEADOR</div>
+                    </div>
+                </td>
+
+                <!-- TRABAJADOR -->
+                <td align="center" style="padding:0 12px; vertical-align:top;">
+                    <div style="width:240px; margin:0 auto; text-align:center;">
+                        <div style="height:110px;"></div>
+                        <div style="width:240px; border-top:2px solid #222; margin:8px auto 6px;"></div>
+
+                        <div style="font-weight:700;">{{ empleado.nombre }}</div>
+                        <div>DNI N.° {{ empleado.dni }}</div>
+                        <div style="font-weight:700;">TRABAJADOR</div>
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+</body>
+
+</html>

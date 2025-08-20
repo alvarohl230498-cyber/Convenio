@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h1>Detalle del colaborador</h1>
+    <div class="d-flex gap-2 mb-3">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">← Volver al inicio</a>
+    </div>
+
+    <!-- Datos del empleado -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h4 class="fw-bold">{{ empleado.nombre }}</h4>
+            <p class="mb-1"><strong>DNI:</strong> {{ empleado.dni }}</p>
+            <p class="mb-1"><strong>Cargo:</strong> {{ empleado.cargo or '-' }}</p>
+            <p class="mb-1"><strong>Fecha Ingreso:</strong>
+                {{ empleado.fecha_ingreso.strftime('%d/%m/%Y') if empleado.fecha_ingreso else '-' }}
+            </p>
+            <p class="mb-0"><strong>Dirección:</strong> {{ empleado.direccion or '-' }}</p>
+        </div>
+    </div>
+
+    <!-- Acciones del empleado -->
+    <form method="POST" action="{{ url_for('delete_employee', empleado_id=empleado.id) }}"
+        onsubmit="return confirm('¿Seguro que quieres eliminar este colaborador?')">
+        <button type="submit" class="btn btn-danger">Eliminar colaborador</button>
+    </form>
+
+    <!-- Tabla de periodos -->
+    <div class="card shadow-sm mb-4 mt-3">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Periodos Vacacionales</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Periodo</th>
+                        <th>Inicio</th>
+                        <th>Fin</th>
+                        <th>Pendientes</th>
+                        <th>Tomados</th>
+                        <th>Truncos</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in periodos %}
+                    <tr>
+                        <td>{{ p.periodo }}</td>
+                        <td>{{ p.fecha_inicio.strftime('%d/%m/%Y') if p.fecha_inicio else '-' }}</td>
+                        <td>{{ p.fecha_fin.strftime('%d/%m/%Y') if p.fecha_fin else '-' }}</td>
+                        <td class="text-success fw-bold">{{ p.dias_pendientes }}</td>
+                        <td class="text-warning fw-bold">{{ p.dias_tomados }}</td>
+                        <td>{{ p.dias_truncos }}</td>
+                        <td class="text-center">
+                            <form action="{{ url_for('delete_period', periodo_id=p.id) }}" method="POST"
+                                style="display:inline-block;">
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                    onclick="return confirm('¿Eliminar periodo?');">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-3">No hay periodos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Formulario para crear nuevo periodo vacacional -->
+    <div class="card mt-4">
+        <div class="card-header bg-primary text-white">
+            Crear nuevo periodo vacacional
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('new_period', empleado_id=empleado.id) }}">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="periodo" class="form-label">Periodo (AAAA-AAAA)</label>
+                        <input type="text" class="form-control" id="periodo" name="periodo" placeholder="2024-2025"
+                            required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="dias_periodo" class="form-label">Días del periodo</label>
+                        <input type="number" class="form-control" id="dias_periodo" name="dias_periodo" value="30"
+                            required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-success">Crear periodo</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Formulario solicitud vacaciones -->
+    <div class="card shadow-sm mb-4 mt-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Solicitar Vacaciones</h5>
+        </div>
+        <div class="card-body">
+            <form action="{{ url_for('solicitar_vacaciones', empleado_id=empleado.id) }}" method="POST" class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Fecha Inicio</label>
+                    <input type="date" name="inicio" id="vac-inicio" class="form-control" required
+                        title="Puedes pegar 28/10/2024, 28-10-2024, 28102024 o 2024-10-28">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Fecha Fin</label>
+                    <input type="date" name="fin" id="vac-fin" class="form-control" required
+                        title="Puedes pegar 28/10/2024, 28-10-2024, 28102024 o 2024-10-28">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Observaciones</label>
+                    <input type="text" name="obs" class="form-control text-uppercase"
+                        oninput="this.value = this.value.toUpperCase();">
+                </div>
+
+                <!-- Selección de periodo vacacional -->
+                <div class="col-md-6">
+                    <label for="periodo_id" class="form-label">Periodo vacacional</label>
+                    <select name="periodo_id" class="form-select" required>
+                        {% for p in periodos %}
+                        <option value="{{ p.id }}">
+                            {{ p.periodo.replace('Periodo ', '') }} - Pendientes: {{ p.dias_pendientes }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {% if require_convenio %}
+                <div class="col-12">
+                    <div class="alert alert-warning">
+                        ⚠ Se detectó que esta solicitud requiere un convenio:
+                        <strong>{{ motivo_convenio }}</strong>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirmar" name="confirmar" value="si"
+                            required>
+                        <label class="form-check-label" for="confirmar">Confirmo la creación del convenio</label>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="col-12">
+                    <input type="hidden" name="confirmar" value="si">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Registrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Historial de movimientos -->
+    <h5>Historial de Movimientos</h5>
+    <table class="table table-sm table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>Tipo</th>
+                <th>Fecha Registro</th>
+                <th>Días</th>
+                <th>Saldo Resultante</th>
+                <th>Inicio Goce Vacacional</th>
+                <th>Fin Goce Vacacional</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mov in empleado.movimientos %}
+            <tr>
+                <td>
+                    {% if mov.id_periodo and mov.tipo != 'CONVENIO' %}
+                    {{ mov.periodo_vacacional.periodo }}
+                    {% else %}
+                    {{ mov.tipo }}
+                    {% endif %}
+                </td>
+                <td>{{ mov.fecha|fecha_pe }}</td>
+                <td>{{ mov.dias }}</td>
+                <td>{{ mov.saldo_resultante }}</td>
+                <td>{{ mov.fecha_inicio|fecha_pe or '' }}</td>
+                <td>{{ mov.fecha_fin|fecha_pe or '' }}</td>
+                <td>
+                    {% if mov.tipo == 'CONVENIO' and mov.id_convenio %}
+                    <!-- Botón que abre el modal para ingresar fecha de firma -->
+                    <button class="btn btn-sm btn-outline-info" data-bs-toggle="modal"
+                        data-bs-target="#modalFirmaMov{{ mov.id }}">
+                        Descargar PDF
+                    </button>
+
+                    <!-- Modal con fecha de firma (SOLO se renderiza si hay id_convenio) -->
+                    <div class="modal fade" id="modalFirmaMov{{ mov.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <!-- CAMBIO: method="GET" para enviar fecha_firma en querystring -->
+                            <form class="modal-content" method="POST"
+                                action="{{ url_for('descargar_convenio_pdf', convenio_id=mov.id_convenio) }}"
+                                target="_blank">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Fecha de firma del convenio</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <label class="form-label">Seleccione la fecha de firma</label>
+                                    <input type="date" name="fecha_firma" class="form-control fecha-firma-input"
+                                        required>
+                                    <div class="form-text">
+                                        Esta fecha se usa al pie del documento y para decidir
+                                        <em>fueron/serán/se vienen gozando</em>.
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-primary" type="submit">Descargar PDF</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <button class="btn btn-warning btn-sm" data-bs-toggle="modal"
+                        data-bs-target="#editModal{{ mov.id }}">
+                        Editar
+                    </button>
+                    <form action="{{ url_for('delete_movimiento', id=mov.id) }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-danger btn-sm"
+                            onclick="return confirm('¿Está seguro de eliminar esta solicitud?');">
+                            Eliminar
+                        </button>
+                    </form>
+                </td>
+            </tr>
+
+            <!-- Modal de edición -->
+            <div class="modal fade" id="editModal{{ mov.id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <form action="{{ url_for('edit_movimiento', id=mov.id) }}" method="POST" class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Editar Movimiento</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label>Fecha Inicio</label>
+                            <input type="date" name="fecha_inicio" value="{{ mov.fecha_inicio }}"
+                                class="form-control mb-2">
+                            <label>Fecha Fin</label>
+                            <input type="date" name="fecha_fin" value="{{ mov.fecha_fin }}" class="form-control">
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal: Fecha de firma para Convenio de Acumulación -->
+<div class="modal fade" id="modalFirma" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <!-- IMPORTANTE: target _blank mantiene la vista y descarga el PDF -->
+        <form class="modal-content" method="POST"
+            action="{{ url_for('generar_convenio_acumulacion_pdf', empleado_id=empleado.id) }}" target="_blank">
+            <div class="modal-header">
+                <h5 class="modal-title">Fecha de firma del convenio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Seleccione la fecha de firma</label>
+                <input type="date" name="fecha_firma" class="form-control" required>
+                <div class="form-text">
+                    Esta fecha se usa en el pie del documento y para decidir
+                    <em>fueron/serán/se vienen gozando</em> en la última viñeta.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" type="submit">Generar PDF</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ======= Mejora: permitir pegar fechas y setear hoy por defecto en modales ======= -->
+<script>
+    (function () {
+        // Normaliza texto pegado a ISO (yyyy-mm-dd)
+        const inputs = [
+            document.getElementById('vac-inicio'),
+            document.getElementById('vac-fin')
+        ];
+
+        function normalizaFecha(str) {
+            if (!str) return null;
+            str = String(str).trim();
+            str = str.replace(/[./\s]/g, '-'); // unifica separadores
+
+            // dd-mm-aaaa
+            let m = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+            if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+
+            // aaaa-mm-dd
+            m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+
+            // ddmmaaaa (8 dígitos)
+            m = str.match(/^(\d{2})(\d{2})(\d{4})$/);
+            if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+
+            return null;
+        }
+
+        inputs.forEach(input => {
+            if (!input) return;
+            input.addEventListener('paste', function (e) {
+                const txt = (e.clipboardData || window.clipboardData).getData('text');
+                const iso = normalizaFecha(txt);
+                if (iso) {
+                    e.preventDefault();
+                    input.value = iso;
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+            input.addEventListener('blur', function (e) {
+                const iso = normalizaFecha(e.target.value);
+                if (iso) e.target.value = iso;
+            });
+        });
+
+        // Setear por defecto la fecha de hoy al abrir cualquier modal de "Descargar PDF"
+        document.addEventListener('shown.bs.modal', function (evt) {
+            const modal = evt.target;
+            if (!modal) return;
+            const dateInput = modal.querySelector('.fecha-firma-input');
+            if (dateInput && !dateInput.value) {
+                const hoy = new Date();
+                const y = hoy.getFullYear();
+                const m = String(hoy.getMonth() + 1).padStart(2, '0');
+                const d = String(hoy.getDate()).padStart(2, '0');
+                dateInput.value = `${y}-${m}-${d}`;
+            }
+        });
+    })();
+</script>
+{% endblock %}
