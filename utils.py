@@ -265,18 +265,45 @@ def aplicar_goce(periodo, empleado, dias: int):
     db.session.add(mov)
 
 def reconciliar_acumulacion_global():
-    """Recalcula truncos/pendientes para todos los periodos al iniciar."""
-    from models import db, Empleado, PeriodoVacacional
+    """Recalcula truncos/pendientes para TODOS los periodos en base a movimientos reales."""
+    from models import db, Empleado, PeriodoVacacional, MovimientoVacacional
+    from datetime import date
+
     hoy = date.today()
+
     for p in PeriodoVacacional.query.all():
-        empleado = Empleado.query.get(p.id_empleado)
-        dias_ganados = calcular_dias_truncos(empleado.fecha_ingreso, hoy, p.fecha_inicio, p.fecha_fin)
-        if dias_ganados >= (p.dias_periodo or 30):
-            p.dias_pendientes = (p.dias_periodo or 30)
-            p.dias_truncos = 0
-        else:
+        e = Empleado.query.get(p.id_empleado)
+        if not e:
+            continue
+
+        dias_periodo = int(p.dias_periodo or 30)
+
+        # 1) Días consumidos por este periodo (GOCE, SOLICITUD_VACACIONES, CONVENIO)
+        consumidos = (
+            db.session.query(db.func.coalesce(db.func.sum(db.func.abs(MovimientoVacacional.dias)), 0))
+            .filter(
+                MovimientoVacacional.id_periodo == p.id,
+                MovimientoVacacional.tipo.in_(('GOCE', 'SOLICITUD_VACACIONES', 'CONVENIO'))
+            )
+            .scalar()
+        ) or 0
+        consumidos = int(consumidos)
+
+        # 2) Estado del periodo
+        if hoy < p.fecha_fin:
+            # Periodo en generación → acumula truncos
+            ganados = int(calcular_dias_truncos(e.fecha_ingreso, hoy, p.fecha_inicio, p.fecha_fin))
+            p.dias_truncos = max(0, ganados - consumidos)
             p.dias_pendientes = 0
-            p.dias_truncos = dias_ganados
+            p.dias_tomados = min(dias_periodo, consumidos)
+        else:
+            # Periodo cerrado → no truncos, pendientes = capacidad - consumidos
+            p.dias_truncos = 0
+            p.dias_pendientes = max(0, dias_periodo - consumidos)
+            p.dias_tomados = min(dias_periodo, consumidos)
+
+        db.session.add(p)
+
     db.session.commit()
 
 
