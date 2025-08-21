@@ -125,7 +125,7 @@
             {% for b in p1.bloques %}
             <li>
                 <b>{{ numero_a_letras(b.dias)|capitalize }} ({{ b.dias }}) DIAS</b>, correspondientes al periodo
-                vacacional {{ b.inicio.year }}–{{ b.fin.year }}; dejándose expresa constancia que, de este periodo de
+                vacacional {{ p1.inicio.year }}–{{ p1.fin.year }}; dejándose expresa constancia que, de este periodo de
                 descanso, {{ b.verbo }} en las fechas del
                 <b>{{ b.inicio.strftime('%d/%m/%Y') }}</b> al <b>{{ b.fin.strftime('%d/%m/%Y') }}</b>.
             </li>
