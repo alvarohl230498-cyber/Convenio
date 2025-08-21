@@ -578,56 +578,79 @@ def edit_movimiento(id):
     return redirect(url_for('view_employee', empleado_id=mov.id_empleado))
 
 
-# 🔵 REEMPLAZO: PDF del convenio basado en MOVIMIENTOS del convenio (p1/p2 correctos)
+
+# 🔵 REEMPLAZO COMPLETO: PDF del convenio basado en los 2 últimos periodos en BD
 @app.route('/convenio/<int:convenio_id>/pdf')
-def convenio_pdf(convenio_id):   # 🔵 CAMBIO
+def convenio_pdf(convenio_id):
     from weasyprint import HTML
     conv = Convenio.query.get_or_404(convenio_id)
     e = conv.empleado
 
-    # Tomar dos periodos más recientes (P1 anterior, P2 actual)                 # 🔵 CAMBIO
+    # 🔵 Tomar los 2 últimos periodos del empleado desde BD (NO desde fecha_ingreso)
     periodos = sorted(e.periodos, key=lambda x: (x.fecha_inicio or date.min))
     if len(periodos) < 2:
         abort(400, description="El empleado no tiene al menos dos periodos.")
-    p2_db = periodos[-1]
-    p1_db = periodos[-2]
+    p1_db = periodos[-2]   # 1er periodo (generado)  -> ej. 2023-2024
+    p2_db = periodos[-1]   # 2do periodo (por generarse) -> ej. 2024-2025
 
-    # Movimientos de este convenio (prorrateados por la lógica de BOLSAS)       # 🔵 CAMBIO
-    movs = (MovimientoVacacional.query
-            .filter_by(id_empleado=e.id, id_convenio=conv.id, tipo='CONVENIO')
-            .order_by(MovimientoVacacional.fecha.asc())
-            .all())
+    # 🔵 Bloques de goce del P1 (histórico): GOCE / SOLICITUD_VACACIONES (excluye CONVENIO)
+    movs_p1_hist = (
+        MovimientoVacacional.query
+        .filter(
+            MovimientoVacacional.id_empleado == e.id,
+            MovimientoVacacional.id_periodo == p1_db.id,
+            MovimientoVacacional.tipo.in_(('GOCE','SOLICITUD_VACACIONES'))
+        )
+        .order_by(MovimientoVacacional.fecha_inicio.asc())
+        .all()
+    )
 
-    dias_p1 = sum(m.dias for m in movs if m.id_periodo == p1_db.id)            # 🔵 CAMBIO
-    dias_p2 = sum(m.dias for m in movs if m.id_periodo == p2_db.id)            # 🔵 CAMBIO
+    bloques_p1 = []
+    for m in movs_p1_hist:
+        ini, fin = m.fecha_inicio, m.fecha_fin
+        if not (ini and fin):
+            continue
+        dias_bloque = (fin - ini).days + 1 if m.dias is None else abs(int(m.dias))
+        bloques_p1.append({
+            "dias": dias_bloque,
+            "periodo": p1_db.periodo,
+            "inicio": ini,
+            "fin": fin,
+            "verbo": verbo_por_bloque(ini, fin, conv.fecha_firma or date.today())
+        })
+    total_p1_bloques = sumar_dias(bloques_p1)
 
-    bloques_p1 = [{                                                            # 🔵 CAMBIO
-        "dias": m.dias,
-        "inicio": m.fecha_inicio,
-        "fin": m.fecha_fin,
-        "verbo": ("serán gozados" if date.today() < (m.fecha_inicio or date.today()) else "fueron gozados")
-    } for m in movs if m.id_periodo == p1_db.id]
+    # 🔵 Remanentes de P1 que se acumulan en b):
+    # 1) si este convenio tiene movimientos CONVENIO en P1 → suma de esos días
+    remanentes_p1_de_este_convenio = sum(
+        abs(m.dias or 0)
+        for m in conv.movimientos
+        if m.tipo == 'CONVENIO' and m.id_periodo == p1_db.id
+    )
+    if remanentes_p1_de_este_convenio:
+        remanentes_p1 = remanentes_p1_de_este_convenio
+    else:
+        # 2) si no hubo, usar los pendientes del periodo en BD (o calcular: 30 - gozados no convenio)
+        remanentes_p1 = int(p1_db.dias_pendientes or 0)
+        if remanentes_p1 == 0:
+            # respaldo por si los pendientes no están sincronizados
+            gozados_nc = sum(
+                abs(m.dias or 0)
+                for m in movs_p1_hist
+            )
+            dias_periodo = int(p1_db.dias_periodo or 30)
+            remanentes_p1 = max(0, dias_periodo - gozados_nc)
 
-    p1_ctx = {                                                                 # 🔵 CAMBIO
-        "inicio": p1_db.fecha_inicio,
-        "fin": p1_db.fecha_fin,
-        "total": dias_p1,
-        "bloques": bloques_p1,
-        "periodo": periodo_label(p1_db.fecha_inicio, p1_db.fecha_fin)
-    }
-    p2_ctx = {                                                                 # 🔵 CAMBIO
-        "inicio": p2_db.fecha_inicio,
-        "fin": p2_db.fecha_fin,
-        "total": dias_p1 + dias_p2,
-        "remanentes_p1": dias_p1,
-        "dias_p2": dias_p2,
-        "ventana_p1_hasta": ventana_max_goce(p1_db.fecha_fin),
-        "ventana_p2_desde": p2_db.fecha_inicio,
-        "ventana_p2_hasta": p2_db.fecha_fin,
-        "periodo": periodo_label(p2_db.fecha_inicio, p2_db.fecha_fin)
-    }
+    # 🔵 P2 siempre tiene 30 para el convenio (por generarse)
+    dias_p2 = 30
+    total_acum = remanentes_p1 + dias_p2
 
-    html = render_template(                                                    # 🔵 CAMBIO
+    # 🔵 Ventanas de goce (como lo tenías): P1 hasta 2 años del fin de generación, P2 su año de goce
+    ventana_p1_hasta = p1_db.fecha_fin.replace(year=p1_db.fecha_fin.year + 2)
+    ventana_p2_desde = p2_db.fecha_inicio.replace(year=p2_db.fecha_inicio.year + 1)
+    ventana_p2_hasta = p2_db.fecha_fin.replace(year=p2_db.fecha_fin.year + 1)
+
+    html = render_template(
         'convenio_pdf.html',
         empresa={
             "razon_social": "CONTRANS S.A.C.",
@@ -638,16 +661,37 @@ def convenio_pdf(convenio_id):   # 🔵 CAMBIO
             "lugar_firma": "Lima",
         },
         empleado=e,
-        p1=p1_ctx,
-        p2=p2_ctx,
-        firma={"fecha_larga": fecha_literal(conv.fecha_firma if conv.fecha_firma else date.today())}
+        # 🔵 P1 y P2 armados con los periodos reales en BD
+        p1={
+            "periodo": p1_db.periodo,
+            "inicio": p1_db.fecha_inicio,
+            "fin": p1_db.fecha_fin,
+            "bloques": bloques_p1,
+            "total": total_p1_bloques
+        },
+        p2={
+            "periodo": p2_db.periodo,
+            "inicio": p2_db.fecha_inicio,
+            "fin": p2_db.fecha_fin,
+            "remanentes_p1": remanentes_p1,
+            "dias_p2": dias_p2,
+            "total": total_acum,
+            "ventana_p1_hasta": ventana_p1_hasta,
+            "ventana_p2_desde": ventana_p2_desde,
+            "ventana_p2_hasta": ventana_p2_hasta,
+        },
+        firma={"fecha_larga": fecha_literal(conv.fecha_firma or date.today())}
     )
 
-    pdf = HTML(string=html, base_url=request.host_url).write_pdf()             # 🔵 CAMBIO
-    return send_file(BytesIO(pdf), download_name=f'convenio_{conv.id}.pdf', as_attachment=True, mimetype='application/pdf')  # 🔵 CAMBIO
+    pdf = HTML(string=html, base_url=request.host_url).write_pdf()
+    return send_file(BytesIO(pdf),
+                    download_name=f'convenio_{conv.id}.pdf',
+                    as_attachment=True,
+                    mimetype='application/pdf')
 
 
-# Descargar convenio (con fecha_firma seleccionable)
+
+# 🔵 REEMPLAZO COMPLETO: misma lógica que el PDF, permitiendo fecha_firma seleccionable
 @app.route('/descargar_convenio_pdf/<int:convenio_id>', methods=['GET', 'POST'])
 def descargar_convenio_pdf(convenio_id):
     from weasyprint import HTML
@@ -666,105 +710,76 @@ def descargar_convenio_pdf(convenio_id):
     else:
         firma = conv.fecha_firma or date.today()
 
-    p1_str, p1_inicio, p1_fin = periodo_from_ingreso(e.fecha_ingreso, 1)
-    p2_str, p2_inicio, p2_fin = periodo_from_ingreso(e.fecha_ingreso, 2)
+    # 🔵 Dos últimos periodos en BD
+    periodos = sorted(e.periodos, key=lambda x: (x.fecha_inicio or date.min))
+    if len(periodos) < 2:
+        abort(400, description="El empleado no tiene al menos dos periodos.")
+    p1_db = periodos[-2]
+    p2_db = periodos[-1]
 
-    movs_p1 = (
-        db.session.query(MovimientoVacacional)
-        .join(PeriodoVacacional, MovimientoVacacional.id_periodo == PeriodoVacacional.id)
+    # 🔵 Bloques P1 (histórico, sin CONVENIO)
+    movs_p1_hist = (
+        MovimientoVacacional.query
         .filter(
             MovimientoVacacional.id_empleado == e.id,
-            PeriodoVacacional.periodo == p1_str,
-            MovimientoVacacional.tipo != 'CONVENIO'
+            MovimientoVacacional.id_periodo == p1_db.id,
+            MovimientoVacacional.tipo.in_(('GOCE','SOLICITUD_VACACIONES'))
         )
         .order_by(MovimientoVacacional.fecha_inicio.asc())
         .all()
     )
     bloques_p1 = []
-    for m in movs_p1:
+    for m in movs_p1_hist:
         ini, fin = m.fecha_inicio, m.fecha_fin
         if not (ini and fin):
             continue
-        dias_bloque = int(abs(m.dias) if m.dias is not None else (fin - ini).days + 1)
+        dias_bloque = (fin - ini).days + 1 if m.dias is None else abs(int(m.dias))
         bloques_p1.append({
             "dias": dias_bloque,
-            "periodo": p1_str,
+            "periodo": p1_db.periodo,
             "inicio": ini,
             "fin": fin,
             "verbo": verbo_por_bloque(ini, fin, firma)
         })
     total_p1_bloques = sumar_dias(bloques_p1)
 
-    p1_db = PeriodoVacacional.query.filter_by(id_empleado=e.id, periodo=p1_str).first()
-    dias_periodo_p1 = p1_db.dias_periodo if (p1_db and p1_db.dias_periodo) else 30
-
-    remanentes_de_este_convenio_p1 = 0
-    if p1_db:
-        remanentes_de_este_convenio_p1 = sum(
-            abs(m.dias or 0)
-            for m in conv.movimientos
-            if m.tipo == 'CONVENIO' and m.id_periodo == p1_db.id
-        )
-
-    remanentes_por_convenio = 0
-    if p1_db and remanentes_de_este_convenio_p1 == 0:
-        remanentes_por_convenio = (
-            db.session.query(db.func.coalesce(db.func.sum(db.func.abs(MovimientoVacacional.dias)), 0))
-            .filter(
-                MovimientoVacacional.id_empleado == e.id,
-                MovimientoVacacional.id_periodo == p1_db.id,
-                MovimientoVacacional.tipo == 'CONVENIO'
-            )
-            .scalar()
-        ) or 0
-
-    remanentes_por_diferencia = 0
-    if p1_db and remanentes_de_este_convenio_p1 == 0 and remanentes_por_convenio == 0:
-        tomados_no_convenio = (
-            db.session.query(db.func.coalesce(db.func.sum(db.func.abs(MovimientoVacacional.dias)), 0))
-            .filter(
-                MovimientoVacacional.id_empleado == e.id,
-                MovimientoVacacional.id_periodo == p1_db.id,
-                MovimientoVacacional.tipo.in_(('GOCE', 'SOLICITUD_VACACIONES'))
-            )
-            .scalar()
-        ) or 0
-
-        if not tomados_no_convenio:
-            tomados_no_convenio = int(abs(p1_db.dias_tomados or 0)) or total_p1_bloques
-
-        remanentes_por_diferencia = max(0, min(30, dias_periodo_p1) - int(tomados_no_convenio))
-
-    if remanentes_de_este_convenio_p1:
-        remanentes_p1 = int(remanentes_de_este_convenio_p1)
-    elif remanentes_por_convenio:
-        remanentes_p1 = int(remanentes_por_convenio)
+    # 🔵 Remanentes P1 (prioridad: movimientos CONVENIO de este convenio → si no, pendientes BD / diferencia)
+    remanentes_p1_de_este_convenio = sum(
+        abs(m.dias or 0)
+        for m in conv.movimientos
+        if m.tipo == 'CONVENIO' and m.id_periodo == p1_db.id
+    )
+    if remanentes_p1_de_este_convenio:
+        remanentes_p1 = remanentes_p1_de_este_convenio
     else:
-        remanentes_p1 = int(remanentes_por_diferencia)
+        remanentes_p1 = int(p1_db.dias_pendientes or 0)
+        if remanentes_p1 == 0:
+            gozados_nc = sum(abs(m.dias or 0) for m in movs_p1_hist)
+            dias_periodo = int(p1_db.dias_periodo or 30)
+            remanentes_p1 = max(0, dias_periodo - gozados_nc)
 
-    dias_p2_completo = 30
-    total_p2 = remanentes_p1 + dias_p2_completo
+    dias_p2 = 30
+    total_acum = remanentes_p1 + dias_p2
 
-    ventana_p1_hasta = p1_fin.replace(year=p1_fin.year + 2)
-    ventana_p2_desde = p2_inicio.replace(year=p2_inicio.year + 1)
-    ventana_p2_hasta = p2_fin.replace(year=p2_fin.year + 1)
-
-    empresa = {
-        "razon_social": "CONTRANS S.A.C.",
-        "ruc": "20392952455",
-        "rep_nombre": "FRANCISCO JOSE GONZALEZ HURTADO",
-        "rep_dni": "40106879",
-        "direccion": "Avenida A N.° 204 – Ex Fundo Oquendo (Alt. Km 8.5 de Av. Néstor Gambetta – Callao, Provincia Constitucional del Callao)",
-        "lugar_firma": "Lima"
-    }
+    ventana_p1_hasta = p1_db.fecha_fin.replace(year=p1_db.fecha_fin.year + 2)
+    ventana_p2_desde = p2_db.fecha_inicio.replace(year=p2_db.fecha_inicio.year + 1)
+    ventana_p2_hasta = p2_db.fecha_fin.replace(year=p2_db.fecha_fin.year + 1)
 
     html = render_template(
         "convenio_pdf.html",
-        empresa=empresa, empleado=e,
-        p1={"periodo": p1_str, "inicio": p1_inicio, "fin": p1_fin,
+        empresa={
+            "razon_social": "CONTRANS S.A.C.",
+            "ruc": "20392952455",
+            "rep_nombre": "FRANCISCO JOSE GONZALEZ HURTADO",
+            "rep_dni": "40106879",
+            "direccion": "Avenida A N.° 204 – Ex Fundo Oquendo (Alt. Km 8.5 de Av. Néstor Gambetta – Callao)",
+            "lugar_firma": "Lima",
+        },
+        empleado=e,
+        p1={"periodo": p1_db.periodo, "inicio": p1_db.fecha_inicio, "fin": p1_db.fecha_fin,
             "bloques": bloques_p1, "total": total_p1_bloques},
-        p2={"periodo": p2_str, "inicio": p2_inicio, "fin": p2_fin,
-            "remanentes_p1": remanentes_p1, "dias_p2": dias_p2_completo, "total": total_p2,
+        p2={"periodo": p2_db.periodo, "inicio": p2_db.fecha_inicio, "fin": p2_db.fecha_fin,
+            "remanentes_p1": remanentes_p1, "dias_p2": dias_p2, "total": total_acum,
             "ventana_p1_hasta": ventana_p1_hasta,
             "ventana_p2_desde": ventana_p2_desde,
             "ventana_p2_hasta": ventana_p2_hasta},
