@@ -8,15 +8,15 @@
         <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-chevron-left"></i> Inicio
         </a>
-        <!-- Si tu endpoint correcto es otro, ajusta; por ahora mantenemos 'convenio_datos' que sí existe en tus logs -->
-        <a href="{{ url_for('convenio_datos') }}" class="btn btn-primary btn-wide">
+        <!-- Antes: url_for('convenio_datos') -> exigía empleado_id y reventaba -->
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-wide"
+            title="Seleccione un colaborador para crear el convenio">
             <i class="bi bi-file-earmark-plus"></i> Nuevo convenio
         </a>
     </div>
 </div>
 
-<!-- Filtros livianos -->
-<form class="row g-2 mb-3" method="get" action="/convenios">
+<form class="row g-2 mb-3" method="get" action="{{ url_for('convenios_list') }}">
     <div class="col-md-4">
         <input type="text" class="form-control" name="q" value="{{ request.args.get('q','') }}"
             placeholder="Buscar por nombre, DNI, tipo…">
@@ -48,7 +48,10 @@
         {% if convenios|length == 0 %}
         <div class="text-center text-muted py-5">
             <p class="mb-2">Aún no hay convenios que coincidan con el criterio.</p>
-            <a class="btn btn-primary btn-wide" href="{{ url_for('convenio_datos') }}">Crear convenio</a>
+            <!-- Antes: url_for('convenio_datos') -> exigía empleado_id -->
+            <a class="btn btn-primary btn-wide" href="{{ url_for('index') }}" title="Ir a empleados y crear convenio">
+                Crear convenio
+            </a>
         </div>
         {% else %}
         <div class="table-responsive">
@@ -98,13 +101,13 @@
                             </button>
 
                             {% if c.id %}
-                            <!-- Descargar PDF: modal para pedir fecha de firma -->
+                            <!-- Descargar PDF: pide fecha de firma -->
                             <button class="btn btn-sm btn-primary" data-bs-toggle="modal"
                                 data-bs-target="#modalPDF{{ c.id }}">
                                 <i class="bi bi-download"></i> PDF
                             </button>
 
-                            <!-- Eliminar (deshabilitado hasta tener la ruta 'convenio_delete') -->
+                            <!-- Eliminar (deshabilitado hasta tener ruta) -->
                             <button class="btn btn-sm btn-danger" disabled title="Pendiente">
                                 <i class="bi bi-trash"></i>
                             </button>
@@ -113,7 +116,6 @@
                     </tr>
 
                     {% if c.id %}
-                    <!-- Modal PDF por convenio -->
                     <div class="modal fade" id="modalPDF{{ c.id }}" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog">
                             <form class="modal-content" method="POST"
@@ -163,7 +165,6 @@
                 input.value = `${y}-${m}-${d}`;
             }
         });
-
         document.addEventListener('submit', function (e) {
             const btn = e.target.querySelector('button[data-loading="true"]');
             if (!btn) return;
