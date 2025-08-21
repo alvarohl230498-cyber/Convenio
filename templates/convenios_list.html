@@ -8,7 +8,7 @@
         <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-chevron-left"></i> Inicio
         </a>
-        <a href="{{ url_for('convenio_nuevo') }}" class="btn btn-primary btn-wide">
+        <a href="{{ url_for('convenio_datos') }}" class="btn btn-primary btn-wide">
             <i class="bi bi-file-earmark-plus"></i> Nuevo convenio
         </a>
     </div>
@@ -47,7 +47,7 @@
         {% if convenios|length == 0 %}
         <div class="text-center text-muted py-5">
             <p class="mb-2">Aún no hay convenios que coincidan con el criterio.</p>
-            <a class="btn btn-primary btn-wide" href="{{ url_for('convenio_nuevo') }}">Crear convenio</a>
+            <a class="btn btn-primary btn-wide" href="{{ url_for('convenio_datos') }}">Crear convenio</a>
         </div>
         {% else %}
         <div class="table-responsive">
