@@ -1,3 +1,4 @@
+# utils.py
 import os
 import io
 from datetime import date, datetime, timedelta
@@ -89,6 +90,53 @@ def sumar_dias(bloques) -> int:
 
 def safe_date(d, fallback=None):
     return d if isinstance(d, date) else fallback
+
+
+# -------------------- UTILIDADES DE PERÍODOS (NUEVO) --------------------
+def rango_solapado(a_ini: date, a_fin: date, b_ini: date, b_fin: date):
+    """
+    Intersección inclusiva entre [a_ini, a_fin] y [b_ini, b_fin].
+    Devuelve (ini, fin, dias) o (None, None, 0) si no hay solapamiento.
+    """
+    if a_ini is None or a_fin is None or b_ini is None or b_fin is None:
+        return (None, None, 0)
+    ini = max(a_ini, b_ini)
+    fin = min(a_fin, b_fin)
+    if ini > fin:
+        return (None, None, 0)
+    dias = (fin - ini).days + 1  # inclusivo
+    return (ini, fin, max(dias, 0))
+
+def periodo_label(fecha_inicio: date, fecha_fin: date) -> str:
+    """ 'AAAA-AAAA' desde las fechas reales del periodo. """
+    if not fecha_inicio or not fecha_fin:
+        return ""
+    return f"{fecha_inicio.year}-{fecha_fin.year}"
+
+def ventana_max_goce(fecha_fin_periodo: date) -> date:
+    """ Política usual: hasta un año después del fin del periodo. Ajusta si tu empresa usa otra. """
+    if not fecha_fin_periodo:
+        return None
+    return fecha_fin_periodo.replace(year=fecha_fin_periodo.year + 1)
+
+def partir_rango_por_bolsas(inicio: date, dias_p1: int, dias_p2: int):
+    """
+    Parte un rango continuo empezando en 'inicio' en dos tramos consecutivos:
+    - tramo P1: primeros 'dias_p1' días
+    - tramo P2: siguientes 'dias_p2' días
+    Devuelve: ((p1_ini, p1_fin), (p2_ini, p2_fin)) con None si días = 0
+    """
+    p1_ini = p1_fin = p2_ini = p2_fin = None
+
+    if dias_p1 and dias_p1 > 0:
+        p1_ini = inicio
+        p1_fin = inicio + timedelta(days=dias_p1 - 1)
+
+    if dias_p2 and dias_p2 > 0:
+        p2_ini = (p1_fin + timedelta(days=1)) if p1_fin else inicio
+        p2_fin = p2_ini + timedelta(days=dias_p2 - 1)
+
+    return (p1_ini, p1_fin), (p2_ini, p2_fin)
 
 
 # -------------------- CÁLCULO DE VACACIONES --------------------

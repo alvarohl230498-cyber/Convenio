@@ -15,7 +15,8 @@ from utils import (
     normalize_db_url, fecha_literal, fecha_firma_literal, numero_a_letras,
     add_months, periodo_from_ingreso, verbo_por_bloque, sumar_dias, safe_date,
     calcular_dias_truncos, calcular_vacaciones,
-    validar_solicitud, aplicar_goce, reconciliar_acumulacion_global, seed_data
+    validar_solicitud, aplicar_goce, reconciliar_acumulacion_global, seed_data,
+    rango_solapado, periodo_label, ventana_max_goce, partir_rango_por_bolsas   # <- ya importado
 )
 
 # =========================================================
@@ -411,35 +412,42 @@ def solicitar_vacaciones(empleado_id):
             obs=obs
         )
 
-    # Caso: convenio confirmado → prorrateo entre P1 y P2
-    if decision['require_convenio'] and confirmar == 'si':
-        periodo_acumulado = decision.get('periodo_acumulado')
+    # 🔵 REEMPLAZO: Caso CONVENIO confirmado → usar BOLSAS (P1 primero, luego P2) y fechas que “viajan”
+    if decision['require_convenio'] and confirmar == 'si':   # 🔵 CAMBIO
+        p1_db = decision.get('periodo_base')        # P1
+        p2_db = decision.get('periodo_acumulado')   # P2 (puede ser None)
 
+        p1_pend = max(0, p1_db.dias_pendientes or 0) if p1_db else 0   # 🔵 CAMBIO
+        p2_pend = max(0, p2_db.dias_pendientes or 0) if p2_db else 0   # 🔵 CAMBIO
+
+        # BOLSAS: consume primero P1; el remanente va a P2                    # 🔵 CAMBIO
+        dias_p1 = min(dias, p1_pend)                                        # 🔵 CAMBIO
+        dias_p2 = min(max(0, dias - dias_p1), p2_pend)                      # 🔵 CAMBIO
+
+        if (dias_p1 + dias_p2) < dias:                                      # 🔵 CAMBIO
+            flash('No hay suficientes días entre P1 y P2 para cubrir la solicitud.', 'danger')
+            return redirect(url_for('view_employee', empleado_id=e.id))
+
+        # Partir rango solicitado en dos tramos consecutivos (“viajan”)       # 🔵 CAMBIO
+        (p1_ini, p1_fin), (p2_ini, p2_fin) = partir_rango_por_bolsas(inicio, dias_p1, dias_p2)  # 🔵 CAMBIO
+
+        # Crear convenio (para PDF)                                           # 🔵 CAMBIO
         conv = Convenio(
             id_empleado=e.id,
             fecha_solicitud=date.today(),
             descripcion=f'{decision["motivo"]} Obs: {obs}',
             dias_acumulados=dias,
             estado_firma='Pendiente',
-            periodo1=decision['periodo_base'].periodo if decision['periodo_base'] else None,
-            detalle_periodo1=f"{decision['periodo_base'].fecha_inicio} al {decision['periodo_base'].fecha_fin}" if decision['periodo_base'] else None,
-            periodo2=periodo_acumulado.periodo if periodo_acumulado else None,
-            detalle_periodo2=f"{periodo_acumulado.fecha_inicio} al {periodo_acumulado.fecha_fin}" if periodo_acumulado else None,
-            dias_segundo=periodo_acumulado.dias_pendientes if periodo_acumulado else 0
+            periodo1=p1_db.periodo if p1_db else None,
+            detalle_periodo1=f"{p1_db.fecha_inicio} al {p1_db.fecha_fin}" if p1_db else None,
+            periodo2=p2_db.periodo if p2_db else None,
+            detalle_periodo2=f"{p2_db.fecha_inicio} al {p2_db.fecha_fin}" if p2_db else None,
+            dias_segundo=p2_db.dias_pendientes if p2_db else 0
         )
         db.session.add(conv)
         db.session.flush()
 
-        decision = validar_solicitud(e, inicio, fin, periodo_forzado=periodo)
-        p1_db = decision.get('periodo_base')         # Periodo base (P1) ya determinado
-        p2_db = decision.get('periodo_acumulado')    # Segundo periodo (P2) si aplica
-
-        # Prorrateo: primero consume P1; el resto va contra P2
-        p1_disponibles = max(0, (p1_db.dias_pendientes or 0)) if p1_db else 0
-        dias_p1 = min(dias, p1_disponibles)
-        dias_p2 = max(0, dias - dias_p1)
-
-
+        # Registrar movimiento P1 con su tramo real                            # 🔵 CAMBIO
         if p1_db and dias_p1 > 0:
             p1_db.dias_pendientes = max(0, (p1_db.dias_pendientes or 0) - dias_p1)
             p1_db.dias_tomados = (p1_db.dias_tomados or 0) + dias_p1
@@ -451,10 +459,11 @@ def solicitar_vacaciones(empleado_id):
                 fecha=date.today(),
                 dias=dias_p1,  # positivo
                 saldo_resultante=p1_db.dias_pendientes,
-                fecha_inicio=inicio,
-                fecha_fin=fin
+                fecha_inicio=p1_ini,
+                fecha_fin=p1_fin
             ))
 
+        # Registrar movimiento P2 con su tramo real                            # 🔵 CAMBIO
         if p2_db and dias_p2 > 0:
             p2_db.dias_pendientes = max(0, (p2_db.dias_pendientes or 0) - dias_p2)
             p2_db.dias_tomados = (p2_db.dias_tomados or 0) + dias_p2
@@ -466,12 +475,12 @@ def solicitar_vacaciones(empleado_id):
                 fecha=date.today(),
                 dias=dias_p2,  # positivo
                 saldo_resultante=p2_db.dias_pendientes,
-                fecha_inicio=inicio,
-                fecha_fin=fin
+                fecha_inicio=p2_ini,
+                fecha_fin=p2_fin
             ))
 
         db.session.commit()
-        flash('Convenio creado, prorrateado entre P1 y P2, y movimientos registrados.')
+        flash('Convenio creado y prorrateado por bolsas (P1 primero, luego P2).')   # 🔵 CAMBIO
         return redirect(url_for('view_employee', empleado_id=e.id))
 
     # Caso: NO requiere convenio → registrar solicitud normal
@@ -569,55 +578,73 @@ def edit_movimiento(id):
     return redirect(url_for('view_employee', empleado_id=mov.id_empleado))
 
 
-# PDF del convenio (detalle)
+# 🔵 REEMPLAZO: PDF del convenio basado en MOVIMIENTOS del convenio (p1/p2 correctos)
 @app.route('/convenio/<int:convenio_id>/pdf')
-def convenio_pdf(convenio_id):
+def convenio_pdf(convenio_id):   # 🔵 CAMBIO
     from weasyprint import HTML
     conv = Convenio.query.get_or_404(convenio_id)
-    emp = conv.empleado
+    e = conv.empleado
 
-    periodo1 = ''
-    periodo2 = ''
-    detalle1 = ''
-    detalle2 = ''
-    dias_acumulados = 0
-    dias_segundo = 0
+    # Tomar dos periodos más recientes (P1 anterior, P2 actual)                 # 🔵 CAMBIO
+    periodos = sorted(e.periodos, key=lambda x: (x.fecha_inicio or date.min))
+    if len(periodos) < 2:
+        abort(400, description="El empleado no tiene al menos dos periodos.")
+    p2_db = periodos[-1]
+    p1_db = periodos[-2]
 
-    per = sorted(emp.periodos, key=lambda x: x.fecha_inicio or date.min)
-    if len(per) >= 1:
-        periodo1 = per[-2].periodo if len(per) >= 2 else per[-1].periodo
-    if len(per) >= 2:
-        periodo2 = per[-1].periodo
+    # Movimientos de este convenio (prorrateados por la lógica de BOLSAS)       # 🔵 CAMBIO
+    movs = (MovimientoVacacional.query
+            .filter_by(id_empleado=e.id, id_convenio=conv.id, tipo='CONVENIO')
+            .order_by(MovimientoVacacional.fecha.asc())
+            .all())
 
-    if len(per) >= 2:
-        p1 = per[-2]
-        p2 = per[-1]
-        detalle1 = f"{p1.dias_tomados} DIAS, correspondientes al periodo vacacional {p1.periodo}; fueron gozados en las fechas registradas."
-        detalle2 = f"{p2.dias_pendientes} DIAS: correspondientes al periodo vacacional {p2.periodo}."
-        dias_acumulados = (p1.dias_pendientes or 0) + (p2.dias_pendientes or 0)
-        dias_segundo = p2.dias_pendientes or 0
-    else:
-        detalle1 = 'Detalle no disponible.'
-        detalle2 = 'Detalle no disponible.'
-        dias_acumulados = conv.dias_acumulados or 0
-        dias_segundo = 0
+    dias_p1 = sum(m.dias for m in movs if m.id_periodo == p1_db.id)            # 🔵 CAMBIO
+    dias_p2 = sum(m.dias for m in movs if m.id_periodo == p2_db.id)            # 🔵 CAMBIO
 
-    rendered = render_template(
+    bloques_p1 = [{                                                            # 🔵 CAMBIO
+        "dias": m.dias,
+        "inicio": m.fecha_inicio,
+        "fin": m.fecha_fin,
+        "verbo": ("serán gozados" if date.today() < (m.fecha_inicio or date.today()) else "fueron gozados")
+    } for m in movs if m.id_periodo == p1_db.id]
+
+    p1_ctx = {                                                                 # 🔵 CAMBIO
+        "inicio": p1_db.fecha_inicio,
+        "fin": p1_db.fecha_fin,
+        "total": dias_p1,
+        "bloques": bloques_p1,
+        "periodo": periodo_label(p1_db.fecha_inicio, p1_db.fecha_fin)
+    }
+    p2_ctx = {                                                                 # 🔵 CAMBIO
+        "inicio": p2_db.fecha_inicio,
+        "fin": p2_db.fecha_fin,
+        "total": dias_p1 + dias_p2,
+        "remanentes_p1": dias_p1,
+        "dias_p2": dias_p2,
+        "ventana_p1_hasta": ventana_max_goce(p1_db.fecha_fin),
+        "ventana_p2_desde": p2_db.fecha_inicio,
+        "ventana_p2_hasta": p2_db.fecha_fin,
+        "periodo": periodo_label(p2_db.fecha_inicio, p2_db.fecha_fin)
+    }
+
+    html = render_template(                                                    # 🔵 CAMBIO
         'convenio_pdf.html',
-        empleado=emp,
-        convenio=conv,
-        fecha_ingreso_literal=fecha_literal(emp.fecha_ingreso),
-        periodo1=periodo1,
-        periodo2=periodo2,
-        detalle_periodo1=detalle1,
-        detalle_periodo2=detalle2,
-        dias_acumulados=dias_acumulados,
-        dias_segundo=dias_segundo,
-        fecha_firma_literal=fecha_literal(conv.fecha_firma if conv.fecha_firma else date.today())
+        empresa={
+            "razon_social": "CONTRANS S.A.C.",
+            "ruc": "20392952455",
+            "rep_nombre": "FRANCISCO JOSE GONZALEZ HURTADO",
+            "rep_dni": "40106879",
+            "direccion": "Avenida A N.° 204 – Ex Fundo Oquendo (Alt. Km 8.5 de Av. Néstor Gambetta – Callao)",
+            "lugar_firma": "Lima",
+        },
+        empleado=e,
+        p1=p1_ctx,
+        p2=p2_ctx,
+        firma={"fecha_larga": fecha_literal(conv.fecha_firma if conv.fecha_firma else date.today())}
     )
 
-    pdf = HTML(string=rendered).write_pdf()
-    return send_file(BytesIO(pdf), download_name=f'convenio_{conv.id}.pdf', as_attachment=True, mimetype='application/pdf')
+    pdf = HTML(string=html, base_url=request.host_url).write_pdf()             # 🔵 CAMBIO
+    return send_file(BytesIO(pdf), download_name=f'convenio_{conv.id}.pdf', as_attachment=True, mimetype='application/pdf')  # 🔵 CAMBIO
 
 
 # Descargar convenio (con fecha_firma seleccionable)
