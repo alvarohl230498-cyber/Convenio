@@ -30,7 +30,8 @@
 
         <div class="mb-3">
             <label for="fecha_ingreso" class="form-label">Fecha de ingreso</label>
-            <input type="date" class="form-control" id="fecha_ingreso" name="fecha_ingreso" required>
+            <input type="date" class="form-control" id="fecha_ingreso" name="fecha_ingreso" required
+                title="Puedes pegar 28/10/2024, 28-10-2024, 28102024 o 2024-10-28" inputmode="numeric">
         </div>
 
         <div class="d-flex justify-content-between">
@@ -45,4 +46,53 @@
         text-transform: uppercase;
     }
 </style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        const input = document.getElementById('fecha_ingreso');
+
+        function normalizaFecha(str) {
+            if (!str) return null;
+            str = String(str).trim();
+
+            // Unifica separadores: ., /, espacios -> -
+            str = str.replace(/[./\s]/g, '-');
+
+            // dd-mm-aaaa
+            let m = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+            if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+
+            // aaaa-mm-dd
+            m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+
+            // ddmmaaaa (8 dígitos)
+            m = str.match(/^(\d{2})(\d{2})(\d{4})$/);
+            if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+
+            return null;
+        }
+
+        if (input) {
+            // Pegar: transforma al vuelo
+            input.addEventListener('paste', function (e) {
+                const txt = (e.clipboardData || window.clipboardData).getData('text');
+                const iso = normalizaFecha(txt);
+                if (iso) {
+                    e.preventDefault();
+                    input.value = iso;
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+
+            // Salir del campo: intenta normalizar lo escrito
+            input.addEventListener('blur', function (e) {
+                const iso = normalizaFecha(e.target.value);
+                if (iso) e.target.value = iso;
+            });
+        }
+    })();
+</script>
 {% endblock %}

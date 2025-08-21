@@ -1,0 +1,4 @@
+{% macro text(name, label, value="", required=false, type="text") -%}
+<label class="form-label {{ 'required' if required }}">{{ label }}</label>
+<input type="{{ type }}" class="form-control" name="{{ name }}" value="{{ value|default('') }}">
+{%- endmacro %}

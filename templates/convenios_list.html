@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}Convenios | RRHH{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">Convenios</h1>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-chevron-left"></i> Inicio
+        </a>
+        <a href="{{ url_for('convenio_nuevo') }}" class="btn btn-primary btn-wide">
+            <i class="bi bi-file-earmark-plus"></i> Nuevo convenio
+        </a>
+    </div>
+</div>
+
+<!-- Filtros livianos (solo UI; no modifica la lógica si no hay backend) -->
+<form class="row g-2 mb-3" method="get" action="{{ url_for('convenios_list') }}">
+    <div class="col-md-4">
+        <input type="text" class="form-control" name="q" value="{{ request.args.get('q','') }}"
+            placeholder="Buscar por nombre, DNI, tipo…">
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" name="tipo">
+            <option value="">Todos los tipos</option>
+            <option value="ACUMULACION" {{ 'selected' if request.args.get('tipo')=='ACUMULACION' else '' }}>Acumulación
+            </option>
+            <option value="ADELANTO" {{ 'selected' if request.args.get('tipo')=='ADELANTO' else '' }}>Adelanto</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select" name="estado">
+            <option value="">Todos los estados</option>
+            <option value="PENDIENTE" {{ 'selected' if request.args.get('estado')=='PENDIENTE' else '' }}>Pendiente
+            </option>
+            <option value="FIRMADO" {{ 'selected' if request.args.get('estado')=='FIRMADO' else '' }}>Firmado</option>
+        </select>
+    </div>
+    <div class="col-md-2 d-grid">
+        <button class="btn btn-outline-primary" type="submit">Filtrar</button>
+    </div>
+</form>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+
+        {% if convenios|length == 0 %}
+        <div class="text-center text-muted py-5">
+            <p class="mb-2">Aún no hay convenios que coincidan con el criterio.</p>
+            <a class="btn btn-primary btn-wide" href="{{ url_for('convenio_nuevo') }}">Crear convenio</a>
+        </div>
+        {% else %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="min-width:220px;">Colaborador</th>
+                        <th>DNI</th>
+                        <th>Tipo</th>
+                        <th>Fecha solicitud</th>
+                        <th>Estado</th>
+                        <th style="min-width:180px;" class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in convenios %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ c.empleado.nombre if c.empleado else '-' }}</div>
+                            <div class="small text-muted">
+                                {{ c.empleado.cargo if c.empleado and c.empleado.cargo else '' }}
+                            </div>
+                        </td>
+                        <td>{{ c.empleado.dni if c.empleado else '-' }}</td>
+                        <td>
+                            {% if c.tipo %}
+                            <span class="badge text-bg-info">{{ c.tipo }}</span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>{{ c.fecha_solicitud|default('', true) }}</td>
+                        <td>
+                            {% set estado = c.estado or 'PENDIENTE' %}
+                            {% if estado == 'FIRMADO' %}
+                            <span class="badge text-bg-success">Firmado</span>
+                            {% elif estado == 'RECHAZADO' %}
+                            <span class="badge text-bg-danger">Rechazado</span>
+                            {% else %}
+                            <span class="badge text-bg-secondary">Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+
+                            <!-- Ver (deshabilitado hasta tener la ruta 'convenio_detalle') -->
+                            <button class="btn btn-sm btn-outline-secondary" disabled title="Pendiente">
+                                <i class="bi bi-eye"></i>
+                            </button>
+
+                            {% if c.id %}
+                            <!-- Descargar PDF: modal para pedir fecha de firma -->
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal"
+                                data-bs-target="#modalPDF{{ c.id }}">
+                                <i class="bi bi-download"></i> PDF
+                            </button>
+
+                            <!-- Eliminar (deshabilitado hasta tener la ruta 'convenio_delete') -->
+                            <button class="btn btn-sm btn-danger" disabled title="Pendiente">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% if c.id %}
+                    <!-- Modal PDF por convenio -->
+                    <div class="modal fade" id="modalPDF{{ c.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <form class="modal-content" method="POST"
+                                action="{{ url_for('descargar_convenio_pdf', convenio_id=c.id) }}" target="_blank">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Fecha de firma</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <label class="form-label">Seleccione la fecha de firma</label>
+                                    <input type="date" name="fecha_firma" class="form-control fecha-firma-input"
+                                        required>
+                                    <div class="form-text">
+                                        Esta fecha se usa en el documento y para la redacción de la última viñeta.
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button class="btn btn-primary btn-wide" type="submit" data-loading="true">
+                                        <span class="spinner-border spinner-border-sm me-2 d-none" role="status"
+                                            aria-hidden="true"></span>
+                                        <span class="btn-text">Descargar PDF</span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        // Fecha de hoy por defecto en modales de PDF
+        document.addEventListener('shown.bs.modal', function (evt) {
+            const input = evt.target?.querySelector('.fecha-firma-input');
+            if (input && !input.value) {
+                const t = new Date();
+                const y = t.getFullYear();
+                const m = String(t.getMonth() + 1).padStart(2, '0');
+                const d = String(t.getDate()).padStart(2, '0');
+                input.value = `${y}-${m}-${d}`;
+            }
+        });
+
+        // Spinner + deshabilitar botón en submit
+        document.addEventListener('submit', function (e) {
+            const btn = e.target.querySelector('button[data-loading="true"]');
+            if (!btn) return;
+            const sp = btn.querySelector('.spinner-border');
+            const txt = btn.querySelector('.btn-text');
+            if (sp) sp.classList.remove('d-none');
+            if (txt) txt.textContent = 'Procesando...';
+            btn.disabled = true;
+        }, true);
+    })();
+</script>
+{% endblock %}

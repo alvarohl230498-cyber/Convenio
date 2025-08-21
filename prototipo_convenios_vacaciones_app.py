@@ -281,6 +281,11 @@ def delete_employee(empleado_id):
     flash('Colaborador eliminado correctamente.')
     return redirect(url_for('index'))
 
+@app.route("/convenios")
+def convenios_list():
+    convenios = Convenio.query.order_by(Convenio.fecha_solicitud.desc()).all()
+    return render_template("convenios_list.html", convenios=convenios)
+
 
 # Ver empleado
 @app.route('/employee/<int:empleado_id>', methods=['GET'])

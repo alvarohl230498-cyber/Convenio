@@ -1,0 +1,5 @@
+/***** Reglas pequeñas y no invasivas *****/
+.table-sm td, .table-sm th { padding: .5rem .75rem; }
+.form-label.required::after { content: " *"; color: #dc3545; }
+.card-hr { border-left: 4px solid #0d6efd; padding-left: .75rem; }
+.btn-wide { min-width: 140px; }
