@@ -6,7 +6,8 @@
         </button>
         <div id="topNav" class="collapse navbar-collapse">
             <ul class="navbar-nav me-auto">
-                <li class="nav-item"><a class="nav-link" href="{{ url_for('convenios_list') }}">Convenios</a></li>
+                <!-- USAR RUTA LITERAL PARA EVITAR BuildError EN PRODUCCIÓN -->
+                <li class="nav-item"><a class="nav-link" href="/convenios">Convenios</a></li>
                 <li class="nav-item"><a class="nav-link disabled">Solicitud de préstamo</a></li>
                 <li class="nav-item"><a class="nav-link disabled">Login</a></li>
                 <li class="nav-item"><a class="nav-link disabled">Integración BUK</a></li>

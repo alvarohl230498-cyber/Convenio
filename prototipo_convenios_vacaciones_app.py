@@ -281,19 +281,15 @@ def delete_employee(empleado_id):
     flash('Colaborador eliminado correctamente.')
     return redirect(url_for('index'))
 
+@app.route("/convenios")
 def convenios_list():
-    # Elegimos una columna de orden disponible sin romper si no existe
+    # fallback seguro de ordenamiento para evitar errores por columnas inexistentes
     order_col = None
     for candidate in ("fecha_solicitud", "created_at", "id"):
         order_col = getattr(Convenio, candidate, None)
         if order_col is not None:
             break
-
-    if order_col is not None:
-        convenios = Convenio.query.order_by(order_col.desc()).all()
-    else:
-        convenios = Convenio.query.all()
-
+    convenios = Convenio.query.order_by(order_col.desc()).all() if order_col else Convenio.query.all()
     return render_template("convenios_list.html", convenios=convenios)
 
 
