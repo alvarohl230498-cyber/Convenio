@@ -8,14 +8,15 @@
         <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
             <i class="bi bi-chevron-left"></i> Inicio
         </a>
+        <!-- Si tu endpoint correcto es otro, ajusta; por ahora mantenemos 'convenio_datos' que sí existe en tus logs -->
         <a href="{{ url_for('convenio_datos') }}" class="btn btn-primary btn-wide">
             <i class="bi bi-file-earmark-plus"></i> Nuevo convenio
         </a>
     </div>
 </div>
 
-<!-- Filtros livianos (solo UI; no modifica la lógica si no hay backend) -->
-<form class="row g-2 mb-3" method="get" action="{{ url_for('convenios_list') }}">
+<!-- Filtros livianos -->
+<form class="row g-2 mb-3" method="get" action="/convenios">
     <div class="col-md-4">
         <input type="text" class="form-control" name="q" value="{{ request.args.get('q','') }}"
             placeholder="Buscar por nombre, DNI, tipo…">
@@ -91,7 +92,6 @@
                             {% endif %}
                         </td>
                         <td class="text-end">
-
                             <!-- Ver (deshabilitado hasta tener la ruta 'convenio_detalle') -->
                             <button class="btn btn-sm btn-outline-secondary" disabled title="Pendiente">
                                 <i class="bi bi-eye"></i>
@@ -153,7 +153,6 @@
 {% block scripts %}
 <script>
     (function () {
-        // Fecha de hoy por defecto en modales de PDF
         document.addEventListener('shown.bs.modal', function (evt) {
             const input = evt.target?.querySelector('.fecha-firma-input');
             if (input && !input.value) {
@@ -165,7 +164,6 @@
             }
         });
 
-        // Spinner + deshabilitar botón en submit
         document.addEventListener('submit', function (e) {
             const btn = e.target.querySelector('button[data-loading="true"]');
             if (!btn) return;
