@@ -1,0 +1,826 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-3">
+
+    <!-- Título -->
+    <div class="d-flex align-items-center mb-3">
+        <h3 class="mb-0">GP-R-004 — Solicitud de Préstamo/Descuento</h3>
+        <span class="badge bg-secondary ms-2">v06</span>
+    </div>
+
+    <!-- Card: Colaborador -->
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">Colaborador</div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-3">
+                    <label class="form-label">DNI</label>
+                    <input class="form-control" name="dni" id="dni" required>
+                </div>
+                <div class="col-6 col-md-3">
+                    <button type="button" class="btn btn-primary w-100" onclick="buscarEmpleado()">Buscar</button>
+                </div>
+                <div class="col-6 col-md-3">
+                    <button type="button" class="btn btn-outline-primary w-100" onclick="abrirCrearEmpleado()">Crear
+                        colaborador</button>
+                </div>
+                <div class="col-12">
+                    <div id="empInfo" class="text-muted small"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card: Detalle -->
+    <form id="frm" class="card mb-3">
+        <div class="card-header fw-semibold">Detalle</div>
+        <div class="card-body">
+            <div class="row g-3">
+
+                <div class="col-md-3">
+                    <label class="form-label">Tipo</label>
+                    <select class="form-select" name="tipo" id="tipo" required>
+                        <optgroup label="Préstamos">
+                            <option>Salud</option>
+                            <option>Fallecimiento</option>
+                            <option>Escolaridad</option>
+                            <option>Estudios</option>
+                            <option>Extraordinario</option>
+                        </optgroup>
+                        <optgroup label="Autorización de descuento">
+                            <option>Adquisición de productos</option>
+                            <option>Pérdida de equipos/implementos</option>
+                            <option>Daño a la infraestructura</option>
+                            <option>Multa de tránsito</option>
+                            <option>Otros</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Si “Otros”, especifique</label>
+                    <input class="form-control" name="motivo_especifico" placeholder="(opcional salvo 'Otros')">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Fecha de solicitud</label>
+                    <input type="date" class="form-control" name="fecha_solicitud" id="fecha_solicitud" required>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Fecha de firma</label>
+                    <input type="date" class="form-control" name="fecha_firma" id="fecha_firma" required>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Monto total (S/.)</label>
+                    <input type="number" min="0.01" step="0.01" class="form-control" name="monto_total" id="monto_total"
+                        required>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">N° de cuotas</label>
+                    <input type="number" min="1" max="60" class="form-control" name="n_cuotas" id="n_cuotas" required>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Inicio cobro — Mes</label>
+                    <input type="number" min="1" max="12" class="form-control" name="mes_inicio" id="mes_inicio"
+                        required>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Inicio cobro — Año</label>
+                    <input type="number" min="2020" max="2100" class="form-control" name="anio_inicio" id="anio_inicio"
+                        required>
+                </div>
+
+                <div class="col-12">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="incluir_grati" name="incluir_grati"
+                            onchange="toggleGrati()">
+                        <label class="form-check-label" for="incluir_grati">
+                            Incluir gratificaciones (julio/diciembre)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Año desde (grati)</label>
+                    <input type="number" min="2020" max="2100" class="form-control" name="anio_grati_desde"
+                        id="anio_grati_desde" disabled>
+                </div>
+
+            </div>
+
+            <div class="mt-3 d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-secondary" onclick="previewCronograma()">
+                    Generar cronograma
+                </button>
+                <button type="button" class="btn btn-success" onclick="guardarYEmitir()">
+                    Guardar y emitir PDF
+                </button>
+                <a href="{{ url_for('prestamos.export_excel') }}" class="btn btn-dark">
+                    Descargar Excel
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Card: Cronograma (preview) -->
+    <div id="cronogramaCard" class="card mb-3 d-none">
+        <div class="card-header fw-semibold">Cronograma</div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <div id="cronograma"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card: Gestión -->
+    <div class="card">
+        <div class="card-header fw-semibold">Gestión de préstamos</div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end mb-2">
+                <div class="col-12 col-md-3">
+                    <label class="form-label">DNI</label>
+                    <input id="qdni" class="form-control" placeholder="DNI">
+                </div>
+                <div class="col-6 col-md-2">
+                    <button class="btn btn-primary w-100" onclick="buscarPrestamos()">Buscar</button>
+                </div>
+                <div class="col-12 col-md-auto">
+                    <button class="btn btn-outline-danger w-100" onclick="cerrarAbiertos()">
+                        Cerrar periodos abiertos (hasta hoy)
+                    </button>
+                </div>
+                <!-- NUEVO: botón de APERTURA -->
+                <div class="col-12 col-md-auto">
+                    <button class="btn btn-outline-secondary w-100" onclick="abrirAperturaMes()">
+                        Reabrir (aperturar) un mes…
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <div id="gridPrestamos"></div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Modal: Crear colaborador -->
+<div class="modal fade" id="dlgEmp" tabindex="-1" aria-labelledby="dlgEmpLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 id="dlgEmpLabel" class="modal-title">Crear colaborador</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">DNI</label>
+                        <input id="e_dni" class="form-control" placeholder="DNI">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Nombre completo</label>
+                        <input id="e_nombre" class="form-control" placeholder="Nombre completo">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Cargo</label>
+                        <input id="e_cargo" class="form-control" placeholder="Cargo">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Dirección</label>
+                        <input id="e_direccion" class="form-control" placeholder="Dirección">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Fecha de ingreso</label>
+                        <input id="e_fi" type="date" class="form-control">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-primary" onclick="crearEmpleado(event)">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- Modal: Amortización -->
+<div class="modal fade" id="dlgAmort" tabindex="-1" aria-labelledby="dlgAmortLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 id="dlgAmortLabel" class="modal-title">Amortización / Cancelación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="amort_id">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Monto</label>
+                        <input id="amort_monto" type="number" step="0.01" min="0.01" class="form-control">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Fecha</label>
+                        <input id="amort_fecha" type="date" class="form-control">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Observación</label>
+                        <input id="amort_obs" class="form-control" placeholder="(opcional)">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cerrar</button>
+                <button class="btn btn-success" onclick="enviarAmortizacion(event)">Aplicar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Cronograma del préstamo -->
+<div class="modal fade" id="dlgCrono" tabindex="-1" aria-labelledby="dlgCronoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 id="dlgCronoLabel" class="modal-title">Cronograma de cuotas</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2 small text-muted" id="cronoMeta"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:70px">#</th>
+                                <th>Etiqueta</th>
+                                <th>Fecha cobro</th>
+                                <th class="text-end">Monto (S/.)</th>
+                                <th>Estado</th>
+                                <th>Desc. real</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cronoBody"></tbody>
+                        <tfoot>
+                            <tr class="fw-semibold">
+                                <td></td>
+                                <td class="text-end" colspan="2">TOTAL</td>
+                                <td class="text-end" id="cronoTotal">0.00</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NUEVO: Modal de Apertura por mes -->
+<div class="modal fade" id="dlgAperturaMes" tabindex="-1" aria-labelledby="dlgAperturaMesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 id="dlgAperturaMesLabel" class="modal-title">Reabrir (aperturar) un mes</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Mes</label>
+                        <select id="ap_mes" class="form-select">
+                            <option value="1">Enero</option>
+                            <option value="2">Febrero</option>
+                            <option value="3">Marzo</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Mayo</option>
+                            <option value="6">Junio</option>
+                            <option value="7">Julio</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Septiembre</option>
+                            <option value="10">Octubre</option>
+                            <option value="11">Noviembre</option>
+                            <option value="12">Diciembre</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Año</label>
+                        <input id="ap_anio" type="number" min="2000" max="2100" class="form-control">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Filtrar por DNI (opcional)</label>
+                        <input id="ap_dni" class="form-control" placeholder="Dejar vacío para TODOS">
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="ap_limpiar_fecha" checked>
+                            <label class="form-check-label" for="ap_limpiar_fecha">
+                                Limpiar fecha de descuento real al reabrir
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-12 small text-muted mt-1">
+                        Pondrá en <b>Pendiente</b> todas las cuotas actualmente <b>Descontada</b> del mes/año
+                        seleccionado
+                        (incluye gratificaciones). Afecta a toda la planilla, salvo que indiques un DNI.
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-secondary" onclick="aperturarMes()">Reabrir</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let dlgEmpModal, dlgAmortModal, dlgCronoModal;
+
+    // Edición previa del cronograma
+    let cronogramaEdit = null;   // arreglo con cuotas generadas/ajustadas
+    let edicionActiva = false;   // bandera para inputs editables
+
+    // NUEVO: referencia al modal de Apertura
+    let dlgAperturaMesModal;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        dlgEmpModal = new bootstrap.Modal(document.getElementById('dlgEmp'));
+        dlgAmortModal = new bootstrap.Modal(document.getElementById('dlgAmort'));
+        dlgCronoModal = new bootstrap.Modal(document.getElementById('dlgCrono'));
+        // init modal de Apertura
+        dlgAperturaMesModal = new bootstrap.Modal(document.getElementById('dlgAperturaMes'));
+    });
+
+    function toggleGrati() {
+        const cb = document.getElementById('incluir_grati');
+        document.getElementById('anio_grati_desde').disabled = !cb.checked;
+    }
+    function val(v) { return (v === undefined || v === null) ? '' : String(v).trim(); }
+    function dinero(n) { return Number(n || 0).toFixed(2); }
+
+    function getForm() {
+        const fd = new FormData(document.getElementById('frm'));
+        const o = Object.fromEntries(fd.entries());
+        o.incluir_grati = document.getElementById('incluir_grati').checked;
+        o.dni = (document.getElementById('dni').value || '').trim(); // DNI fuera del form
+        return o;
+    }
+
+    // --- Helpers de dinero (para no perder el foco mientras escribes)
+    function normMoney(v) {
+        v = String(v || '').replace(',', '.').replace(/[^0-9.]/g, '');
+        const parts = v.split('.');
+        if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+        return v;
+    }
+    function toNumber(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+    // --- ÚNICA versión de editCampo (NO re-renderiza al escribir monto)
+    function editCampo(i, campo, valor) {
+        if (!cronogramaEdit) return;
+
+        if (campo === 'monto') {
+            cronogramaEdit[i].monto = toNumber(normMoney(valor));
+            updatePrevTotal();              // solo actualiza TOTAL
+            return;
+        }
+        if (campo === 'es_grati') { cronogramaEdit[i].es_grati = !!valor; return; }
+        if (campo === 'anio' || campo === 'mes' || campo === 'orden') {
+            cronogramaEdit[i][campo] = parseInt(valor || 0) || 0;
+            return;
+        }
+        cronogramaEdit[i][campo] = valor; // etiqueta, etc.
+    }
+
+    function updatePrevTotal() {
+        const total = (cronogramaEdit || []).reduce((s, x) => s + Number(x.monto || 0), 0);
+        const t = document.getElementById('cronoPrevTotal');
+        if (t) t.textContent = dinero(total);
+    }
+
+    function toggleEdicion() {
+        edicionActiva = !edicionActiva;
+        renderCronograma();  // aquí sí re-render completo
+    }
+
+    function renderCronograma() {
+        if (!cronogramaEdit) return;
+        const rows = [];
+        rows.push(`
+        <div class="d-flex gap-2 mb-2">
+        <button type="button" class="btn btn-outline-info btn-sm" onclick="toggleEdicion()">
+            ${edicionActiva ? 'Bloquear edición' : 'Editar cronograma'}
+        </button>
+        <small class="text-muted">Ajusta etiquetas, mes/año y montos. El total se actualiza en vivo.</small>
+        </div>
+        <table class="table table-sm table-striped align-middle mb-0">
+        <thead class="table-light">
+            <tr>
+                <th style="width:70px">#</th>
+                <th>Etiqueta</th>
+                <th style="width:110px">Mes</th>
+                <th style="width:110px">Año</th>
+                <th class="text-end" style="width:140px">Monto (S/.)</th>
+                <th style="width:120px">¿Grati?</th>
+            </tr>
+        </thead>
+        <tbody>`);
+
+        cronogramaEdit.forEach((it, i) => {
+            rows.push(`<tr>
+        <td>${it.orden}</td>
+        <td>${edicionActiva
+                    ? `<input class="form-control form-control-sm" value="${val(it.etiqueta)}"
+                        oninput="editCampo(${i}, 'etiqueta', this.value)">`
+                    : val(it.etiqueta)
+                }</td>
+        <td>${edicionActiva
+                    ? `<input type="number" min="1" max="12" class="form-control form-control-sm"
+                        value="${it.mes}" oninput="editCampo(${i}, 'mes', this.value)">`
+                    : it.mes
+                }</td>
+        <td>${edicionActiva
+                    ? `<input type="number" min="2020" max="2100" class="form-control form-control-sm"
+                        value="${it.anio}" oninput="editCampo(${i}, 'anio', this.value)">`
+                    : it.anio
+                }</td>
+        <td class="text-end">${edicionActiva
+                    ? `<input type="text" inputmode="decimal"
+                        class="form-control form-control-sm text-end"
+                        value="${dinero(it.monto)}"
+                        oninput="editCampo(${i}, 'monto', this.value)"
+                        onblur="this.value = dinero(normMoney(this.value)); editCampo(${i}, 'monto', this.value)">`
+                    : dinero(it.monto)
+                }</td>
+        <td>${edicionActiva
+                    ? `<input class="form-check-input" type="checkbox" ${it.es_grati ? 'checked' : ''}
+                        onchange="editCampo(${i}, 'es_grati', this.checked)">`
+                    : (it.es_grati ? '<span class="badge text-bg-info">Gratificación</span>' : '')
+                }</td>
+        </tr>`);
+        });
+
+        const total = cronogramaEdit.reduce((s, x) => s + Number(x.monto || 0), 0);
+        rows.push(`
+        <tr class="fw-semibold">
+            <td></td>
+            <td class="text-end" colspan="3">TOTAL</td>
+            <td class="text-end" id="cronoPrevTotal">${dinero(total)}</td>
+            <td></td>
+        </tr>
+    </tbody></table>`);
+
+        document.getElementById('cronograma').innerHTML = rows.join('');
+        document.getElementById('cronogramaCard').classList.remove('d-none');
+    }
+
+
+
+
+
+    // ====== Resto de funciones (sin cambios) ======
+
+
+
+    async function buscarEmpleado() { /* igual que ya tienes */
+        const dni = document.getElementById('dni').value.trim();
+        const empDiv = document.getElementById('empInfo');
+        if (!dni) { alert('Ingrese DNI'); return; }
+        try {
+            const resp = await fetch(`/api/prestamos/empleados?dni=${encodeURIComponent(dni)}`);
+            if (!resp.ok) {
+                const text = await resp.text();
+                console.error('Error GET /api/prestamos/empleados:', resp.status, text);
+                empDiv.innerHTML = `<span class="text-danger">Error ${resp.status}: no se pudo consultar el colaborador.</span>`;
+                return;
+            }
+            const data = await resp.json();
+            if (Array.isArray(data) && data.length) {
+                empDiv.innerHTML = `<span class="text-success"><b>Empleado encontrado:</b> ${data[0].nombre} (DNI ${data[0].dni})</span>`;
+            } else {
+                empDiv.innerHTML = `<span class="text-danger">No existe colaborador. Use “Crear colaborador”.</span>`;
+            }
+        } catch (err) {
+            console.error(err);
+            empDiv.innerHTML = `<span class="text-danger">Error de red al consultar el colaborador.</span>`;
+        }
+    }
+
+    function abrirCrearEmpleado() {
+        document.getElementById('e_dni').value = document.getElementById('dni').value.trim();
+        dlgEmpModal.show();
+    }
+
+    async function crearEmpleado(ev) {
+        ev.preventDefault();
+        const payload = {
+            dni: document.getElementById('e_dni').value.trim(),
+            nombre: document.getElementById('e_nombre').value.trim(),
+            cargo: document.getElementById('e_cargo').value.trim(),
+            direccion: document.getElementById('e_direccion').value.trim(),
+            fecha_ingreso: document.getElementById('e_fi').value || null
+        };
+        const res = await fetch('/api/prestamos/empleados', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        let js; try { js = await res.json(); } catch { js = {}; }
+        if (!res.ok) { alert(js.error || 'No se pudo crear el colaborador.'); return; }
+        dlgEmpModal.hide();
+        document.getElementById('empInfo').innerHTML =
+            '<span class="text-success">Colaborador creado. Puede continuar.</span>';
+    }
+
+    async function previewCronograma() {
+        const o = getForm();
+        const payload = {
+            monto_total: o.monto_total, n_cuotas: o.n_cuotas,
+            mes_inicio: o.mes_inicio, anio_inicio: o.anio_inicio,
+            incluir_grati: o.incluir_grati, anio_grati_desde: o.anio_grati_desde
+        };
+        const r = await fetch('/api/prestamos/cronograma/preview', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        const js = await r.json();
+        if (!r.ok) { alert(js.error || 'Error'); return; }
+
+        cronogramaEdit = js.items.map(x => ({
+            orden: x.orden, etiqueta: x.etiqueta, anio: x.anio, mes: x.mes,
+            es_grati: !!x.es_grati, monto: Number(x.monto)
+        }));
+        edicionActiva = true;  // entra directo en modo edición si quieres
+        renderCronograma();
+    }
+
+    async function guardarYEmitir() {
+        const o = getForm();
+        if (!o.dni) { alert('Ingrese y busque un DNI antes de guardar.'); return; }
+        if (o.tipo === 'Otros' && !val(o.motivo_especifico)) {
+            alert('Debe especificar el motivo en "Otros"'); return;
+        }
+        const payload = { ...o };
+        if (Array.isArray(cronogramaEdit) && cronogramaEdit.length > 0) {
+            payload.cuotas_custom = cronogramaEdit.map(c => ({
+                orden: c.orden, etiqueta: c.etiqueta,
+                anio: Number(c.anio || 0), mes: Number(c.mes || 0),
+                es_grati: !!c.es_grati, monto: Number(c.monto || 0)
+            }));
+        }
+        const res = await fetch('/api/prestamos', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        const js = await res.json();
+        if (!res.ok) { alert(js.error || 'Error'); return; }
+        window.location.href = js.pdf_url;
+    }
+
+    async function buscarPrestamos() {
+        const dni = document.getElementById('qdni').value.trim();
+        const r = await fetch(`/api/prestamos?dni=${encodeURIComponent(dni)}`);
+        const js = await r.json();
+        const rows = [];
+        rows.push(`<table class="table table-sm table-striped align-middle mb-0">
+        <thead class="table-dark">
+        <tr><th>ID</th><th>DNI</th><th>Nombre</th><th>Tipo</th>
+            <th class="text-end">Monto</th><th class="text-end">Saldo</th><th>Estado</th><th>Acciones</th></tr>
+        </thead><tbody>`);
+        js.forEach(p => {
+            rows.push(`<tr>
+        <td>${p.id}</td><td>${p.dni}</td><td>${p.nombre}</td><td>${p.tipo}</td>
+        <td class="text-end">${p.monto_total.toFixed(2)}</td>
+        <td class="text-end">${p.saldo_pendiente.toFixed(2)}</td>
+        <td>${p.estado}</td>
+        <td class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-info" onclick="verCronograma(${p.id})">Consultar</button>
+            <button class="btn btn-sm btn-outline-success" onclick="openAmort(${p.id})">Amortizar</button>
+            <a class="btn btn-sm btn-outline-secondary" href="/prestamos/${p.id}/pdf">PDF</a>
+            <button class="btn btn-sm btn-outline-danger" onclick="deletePrestamo(${p.id}, this)">Eliminar</button>
+        </td>
+        </tr>`);
+        });
+        rows.push(`</tbody></table>`);
+        document.getElementById('gridPrestamos').innerHTML = rows.join('');
+    }
+
+    async function openAmort(id) {
+        // setea ID y fecha hoy
+        document.getElementById('amort_id').value = id;
+        document.getElementById('amort_fecha').valueAsDate = new Date();
+
+        // limpia monto/obs
+        const inputMonto = document.getElementById('amort_monto');
+        inputMonto.value = '';
+        document.getElementById('amort_obs').value = '';
+
+        // muestra modal de inmediato (mejor UX)
+        dlgAmortModal.show();
+
+        try {
+            const r = await fetch(`/api/prestamos/${id}/saldo`);
+            const js = await r.json();
+            if (!r.ok) throw new Error(js.error || 'No se pudo obtener el saldo');
+
+            const saldo = Number(js.saldo ?? 0);
+            // Prefija el monto con el saldo
+            inputMonto.value = saldo.toFixed(2);
+
+            // Opcional: evita exceder saldo
+            if (saldo > 0) {
+                inputMonto.setAttribute('max', saldo.toFixed(2));
+                inputMonto.setAttribute('min', '0.01');
+            } else {
+                inputMonto.removeAttribute('max');
+            }
+        } catch (e) {
+            alert('Error al obtener el saldo: ' + e.message);
+        }
+    }
+
+    async function enviarAmortizacion(ev) {
+        ev.preventDefault();
+        const id = document.getElementById('amort_id').value;
+        const payload = {
+            monto: document.getElementById('amort_monto').value,
+            fecha: document.getElementById('amort_fecha').value,
+            observacion: document.getElementById('amort_obs').value,
+            usuario: 'web'
+        };
+        const r = await fetch(`/api/prestamos/${id}/amortizacion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const js = await r.json();
+        if (!r.ok) { alert(js.error || 'Error'); return; }
+        dlgAmortModal.hide();
+        // refresca tu listado como ya haces
+        buscarPrestamos && buscarPrestamos();
+    }
+
+    async function verCronograma(prestamoId) {
+        try {
+            const resp = await fetch(`/api/prestamos/${prestamoId}/cuotas`);
+            if (!resp.ok) {
+                const txt = await resp.text();
+                console.error('GET cuotas', resp.status, txt);
+                alert('No se pudo obtener el cronograma.');
+                return;
+            }
+            const js = await resp.json();
+            document.getElementById('dlgCronoLabel').textContent = `Cronograma de cuotas – Préstamo #${js.id}`;
+            document.getElementById('cronoMeta').innerHTML =
+                `<b>DNI:</b> ${js.dni} &nbsp;|&nbsp; <b>Nombre:</b> ${js.nombre} &nbsp;|&nbsp; ` +
+                `<b>Tipo:</b> ${js.tipo} &nbsp;|&nbsp; <b>Monto total:</b> S/ ${js.monto_total.toFixed(2)} &nbsp;|&nbsp; ` +
+                `<b>Saldo:</b> S/ ${js.saldo_pendiente.toFixed(2)}`;
+            const body = document.getElementById('cronoBody');
+            body.innerHTML = js.cuotas.map(c => `
+            <tr>
+                <td>${c.orden}</td>
+                <td>${c.etiqueta}${c.es_grati ? ' <span class="badge text-bg-info">Gratificación</span>' : ''}</td>
+                <td>${c.fecha_cobro}</td>
+                <td class="text-end">${Number(c.monto).toFixed(2)}</td>
+                <td>${c.estado}</td>
+                <td>${c.fecha_descuento_real || ''}</td>
+            </tr>
+            `).join('');
+            const total = js.cuotas.reduce((s, c) => s + Number(c.monto), 0);
+            document.getElementById('cronoTotal').textContent = dinero(total);
+            dlgCronoModal.show();
+        } catch (e) {
+            console.error(e);
+            alert('Error de red al consultar el cronograma.');
+        }
+    }
+    // ====== CIERRE DE PERIDIO ======
+
+    async function cerrarAbiertos() {
+        const dni = (document.getElementById('qdni').value || '').trim();
+        const hoy = new Date();
+        const mes = parseInt(prompt('Mes a cerrar (1-12):', String(hoy.getMonth() + 1)), 10);
+        const anio = parseInt(prompt('Año a cerrar:', String(hoy.getFullYear())), 10);
+        if (!anio || !(mes >= 1 && mes <= 12)) return;
+
+        const fecha_descuento = new Date(anio, mes, 0).toISOString().slice(0, 10);
+        if (!confirm(`¿Cerrar ${mes}/${anio} para ${dni ? 'DNI ' + dni : 'TODOS'}?`)) return;
+
+        try {
+            const resp = await fetch('/api/prestamos/cerrar_mes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ anio, mes, fecha_descuento, dni: dni || null })
+            });
+
+            const raw = await resp.text();
+            let js; try { js = JSON.parse(raw); } catch { js = { error: raw }; }
+
+            if (!resp.ok || js.error) {
+                alert(js.error || `Error ${resp.status}`);
+                return;
+            }
+
+            alert(
+                `Cierre OK\n` +
+                `Cuotas cerradas: ${js.cerradas}\n` +
+                `Monto total: S/ ${Number(js.monto).toFixed(2)}\n` +
+                `Préstamos cancelados: ${js.prestamos_cancelados}\n` +
+                `Préstamos parciales: ${js.prestamos_parciales}`
+            );
+            if (document.getElementById('qdni').value.trim()) await buscarPrestamos();
+        } catch (e) {
+            console.error(e);
+            alert('Error de red al cerrar el mes.');
+        }
+    }
+
+
+    // ====== NUEVO: Apertura (reabrir) ======
+    function abrirAperturaMes() {
+        const hoy = new Date();
+        document.getElementById('ap_mes').value = (hoy.getMonth() + 1);
+        document.getElementById('ap_anio').value = hoy.getFullYear();
+        document.getElementById('ap_dni').value = (document.getElementById('qdni').value || '').trim();
+        document.getElementById('ap_limpiar_fecha').checked = true;
+        dlgAperturaMesModal.show();
+    }
+
+    async function aperturarMes() {
+        const mes = parseInt(document.getElementById('ap_mes').value, 10);
+        const anio = parseInt(document.getElementById('ap_anio').value, 10);
+        const dni = (document.getElementById('ap_dni').value || '').trim();
+        const limpiar = document.getElementById('ap_limpiar_fecha').checked;
+
+        if (!anio || !mes) { alert('Completa mes y año.'); return; }
+        if (!confirm(`¿Reabrir ${mes}/${anio} para ${dni ? 'DNI ' + dni : 'TODOS'}?`)) return;
+
+        try {
+            const resp = await fetch('/api/prestamos/aperturar_mes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ anio, mes, dni: dni || null, limpiar_fecha: !!limpiar })
+            });
+
+            let js = {};
+            try { js = await resp.json(); } catch (_) { /* respuesta no-JSON */ }
+
+            if (!resp.ok || js.error) {
+                alert(js.error || 'No se pudo reabrir el mes.');
+                return;
+            }
+
+            dlgAperturaMesModal.hide();
+            alert(`Apertura OK\nCuotas reabiertas: ${js.reabiertas}\nPrestamos con saldo: ${js.prestamos_afectados}`);
+            if (document.getElementById('qdni').value.trim()) {
+                await buscarPrestamos();
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error de red al reabrir el mes.');
+        }
+    }
+
+    // ====== NUEVO: Eliminar (borrado duro) ======
+    async function deletePrestamo(id, btn) {
+        if (!confirm(`¿Eliminar el préstamo #${id}? Esta acción no se puede deshacer.`)) return;
+
+        const origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = 'Eliminando…';
+
+        try {
+            let resp = await fetch(`/api/prestamos/${id}`, { method: 'DELETE' });
+
+            // Fallback si el servidor bloquea DELETE
+            if (resp.status === 405 || resp.status === 404) {
+                resp = await fetch(`/api/prestamos/${id}`, { method: 'POST' });
+            }
+
+            let js = {};
+            try { js = await resp.json(); } catch { }
+
+            if (!resp.ok || js.error) {
+                alert(js.error || `No se pudo eliminar el préstamo #${id}.`);
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+                return;
+            }
+
+            await buscarPrestamos();
+        } catch (e) {
+            console.error(e);
+            alert('Error de red al eliminar.');
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+</script>
+{% endblock %}

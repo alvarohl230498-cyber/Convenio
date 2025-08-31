@@ -1,18 +1,39 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">RRHH | Convenios</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav">
+        <a class="navbar-brand fw-bold" href="{{ url_for('prestamos.ui_nuevo_prestamo') }}">RRHH | Convenios</a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topNav"
+            aria-controls="topNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+
         <div id="topNav" class="collapse navbar-collapse">
             <ul class="navbar-nav me-auto">
-                <!-- USAR RUTA LITERAL PARA EVITAR BuildError EN PRODUCCIÓN -->
-                <li class="nav-item"><a class="nav-link" href="/convenios">Convenios</a></li>
-                <li class="nav-item"><a class="nav-link disabled">Solicitud de préstamo</a></li>
-                <li class="nav-item"><a class="nav-link disabled">Login</a></li>
-                <li class="nav-item"><a class="nav-link disabled">Integración BUK</a></li>
+
+                <!-- Convenios (ruta literal para evitar BuildError si cambia el endpoint) -->
+                <li class="nav-item">
+                    <a class="nav-link {{ 'active' if request.path.startswith('/convenios') else '' }}"
+                        href="/convenios">
+                        Convenios
+                    </a>
+                </li>
+
+                <!-- Solicitud de préstamo (usa el endpoint del blueprint de préstamos) -->
+                <li class="nav-item">
+                    <a class="nav-link {{ 'active' if request.path.startswith('/prestamos') else '' }}"
+                        href="{{ url_for('prestamos.ui_nuevo_prestamo') }}">
+                        Solicitud de préstamo
+                    </a>
+                </li>
+
+                <!-- Login (aún no implementado) -->
+                <li class="nav-item">
+                    <a class="nav-link disabled" tabindex="-1" aria-disabled="true">Login</a>
+                </li>
+
             </ul>
-            <span class="navbar-text small opacity-75">Fase 1 UI/UX</span>
+
+            <span class="navbar-text small opacity-75">Fase 2 Solicitar Préstamo</span>
         </div>
     </div>
 </nav>

@@ -1,0 +1,347 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>GP-R-004 — Solicitud de Préstamo/Descuento</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 16mm 16mm 16mm 16mm;
+        }
+
+        :root {
+            /* === Parámetros de ajuste rápido === */
+            --cronograma-width: 130mm;
+            /* ancho del cuadro de cronograma */
+            --base-font: 10pt;
+            /* fuente general del documento */
+            --line-height: 1.28;
+            /* interlineado global ligero */
+            --table-font: 9.5pt;
+            /* fuente de la tabla */
+            --table-pad-y: 3px;
+            /* padding vertical de celdas */
+            --table-pad-x: 6px;
+            /* padding horizontal de celdas */
+
+            /* Motivos: proporciones y espacios */
+            --motivos-left: 36%;
+            /* PRÉSTAMOS (más pequeño) */
+            --motivos-right: 64%;
+            /* AUTORIZACIÓN (más grande) */
+            --motivos-gap: 18px;
+            /* espacio entre columnas */
+            --motivos-li-gap: 10px;
+            /* separación entre ítems de las listas */
+            --motivos-bottom-gap: 9mm;
+            /* ESPACIO debajo del bloque de motivos */
+
+            /* Ajuste de paréntesis en la COLUMNA DERECHA */
+            --right-inner-pad: 32px;
+            /* separa los paréntesis del borde derecho */
+            --right-paren-col: 24px;
+            /* ancho fijo de la “columna” de paréntesis */
+            --paren-minwidth: 22px;
+            /* ancho mínimo del bloque ( X ) */
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            font-size: var(--base-font);
+            line-height: var(--line-height);
+            color: #111;
+        }
+
+        /* ===== Encabezado como imagen ===== */
+        .header-wrap {
+            margin-bottom: 7mm;
+        }
+
+        .header-wrap img {
+            display: block;
+            width: 100%;
+            height: auto;
+            image-rendering: auto;
+        }
+
+        /* Fecha del documento */
+        .fecha-doc {
+            text-align: right;
+            font-size: calc(var(--base-font) + 1pt);
+            margin-top: -2mm;
+            margin-bottom: 5mm;
+        }
+
+        /* Utilidades */
+        .section {
+            margin-top: 8px;
+        }
+
+        .small {
+            font-size: calc(var(--base-font) - 1pt);
+        }
+
+        .mt-6 {
+            margin-top: 6px;
+        }
+
+        .mt-12 {
+            margin-top: 12px;
+        }
+
+        /* ===== MOTIVOS ===== */
+        .motivos {
+            display: grid;
+            grid-template-columns: var(--motivos-left) var(--motivos-right);
+            column-gap: var(--motivos-gap);
+            margin-top: 8px;
+            margin-bottom: var(--motivos-bottom-gap);
+            /* <<< separa de “La programación…” */
+        }
+
+        .mot-col.right {
+            border-left: 1.5px solid #000;
+            padding-left: 22px;
+            /* detrás de la línea vertical */
+            padding-right: var(--right-inner-pad);
+            /* trae paréntesis hacia adentro */
+        }
+
+        .mot-title {
+            font-weight: 800;
+            text-transform: uppercase;
+            margin: 0 0 6px 0;
+        }
+
+        ul.bulleted {
+            list-style: disc;
+            padding-left: 20px;
+            /* sangría del bullet */
+            margin: 0;
+        }
+
+        /* Texto + paréntesis alineados */
+        ul.bulleted li {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            margin: var(--motivos-li-gap) 0;
+            /* <<< más separación entre líneas */
+        }
+
+        /* En la COLUMNA DERECHA: fija columna de paréntesis */
+        .mot-col.right ul.bulleted li {
+            grid-template-columns: 1fr var(--right-paren-col);
+        }
+
+        .parens {
+            font-family: "Courier New", monospace;
+            /* ancho fijo para ( X ) */
+            font-weight: 700;
+            display: inline-block;
+            min-width: var(--paren-minwidth);
+            text-align: center;
+        }
+
+        .parens::before {
+            content: "(";
+        }
+
+        .parens::after {
+            content: ")";
+        }
+
+        /* ===== Cronograma (ancho controlado) ===== */
+        .cronograma {
+            width: var(--cronograma-width);
+            margin: 0;
+        }
+
+        /* para centrar: margin:0 auto */
+        .cronograma-title {
+            margin: 0 0 6px 0;
+        }
+
+        table.table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--table-font);
+        }
+
+        .table th,
+        .table td {
+            border: 1px solid #000;
+            padding: var(--table-pad-y) var(--table-pad-x);
+        }
+
+        .table th {
+            font-weight: 700;
+        }
+
+        .table th:nth-child(1),
+        .table td:nth-child(1) {
+            width: 11%;
+            text-align: center;
+        }
+
+        .table th:nth-child(2),
+        .table td:nth-child(2) {
+            width: 57%;
+        }
+
+        .table th:nth-child(3),
+        .table td:nth-child(3) {
+            width: 32%;
+            text-align: right;
+        }
+
+        /* ===== Firmas horizontales ===== */
+        .firmas-h {
+            display: grid;
+            grid-template-columns: 46% 2% 52%;
+            row-gap: 12px;
+            column-gap: 6px;
+            margin-top: 26px;
+            font-size: var(--base-font);
+        }
+
+        .sig-label {
+            font-weight: 600;
+        }
+
+        .sig-colon {
+            text-align: center;
+        }
+
+        .sig-line {
+            border-bottom: 1px solid #000;
+            height: 0;
+            align-self: center;
+            padding-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Encabezado como imagen -->
+    <div class="header-wrap">
+        <img src="{{ url_for('static', filename='imagenes/Encabezado.png') }}" alt="Encabezado Contrans (GP-R-004)">
+    </div>
+
+    <p class="fecha-doc">Fecha: {{ hoy.strftime('%d/%m/%Y') }}</p>
+
+    <!-- Cuerpo -->
+    <div class="section">
+        <p>Señores<br><b>CONTRANS SAC</b><br>Presente.-</p>
+        <p><b>A quien corresponda:</b></p>
+
+        <p>
+            Yo, <b>{{ emp_nombre }}</b> con DNI <b>{{ emp.dni }}</b>, por medio de la presente autorizo a
+            Contrans SAC se me descuente de mis haberes mensuales la siguiente suma de dinero:
+            <b>S/ {{ '%.2f'|format(p.monto_total) }}</b> en <b>{{ '%02d'|format(p.n_cuotas) }}</b> cuota(s),
+            por el siguiente motivo:
+        </p>
+    </div>
+
+    <!-- Motivos -->
+    <div class="section motivos">
+        <div class="mot-col left">
+            <p class="mot-title">PRÉSTAMOS:</p>
+            <ul class="bulleted">
+                <li><span>Salud</span> <span class="parens">{{ ('X' if p.tipo=='Salud' else '&nbsp;')|safe }}</span>
+                </li>
+                <li><span>Fallecimiento</span> <span class="parens">{{ ('X' if p.tipo=='Fallecimiento' else
+                        '&nbsp;')|safe }}</span></li>
+                <li><span>Escolaridad</span> <span class="parens">{{ ('X' if p.tipo=='Escolaridad' else '&nbsp;')|safe
+                        }}</span></li>
+                <li><span>Estudios</span> <span class="parens">{{ ('X' if p.tipo=='Estudios' else '&nbsp;')|safe
+                        }}</span></li>
+                <li><span>Extraordinario</span> <span class="parens">{{ ('X' if p.tipo=='Extraordinario' else
+                        '&nbsp;')|safe }}</span></li>
+            </ul>
+        </div>
+
+        <div class="mot-col right">
+            <p class="mot-title">AUTORIZACIÓN DE DESCUENTO:</p>
+            <ul class="bulleted">
+                <li><span>Adquisición de Productos</span> <span class="parens">{{ ('X' if p.tipo=='Adquisición de
+                        Productos' else '&nbsp;')|safe }}</span></li>
+                <li><span>Pérdida de Equipos y/o implementos</span>
+                    <span class="parens">{{ ('X' if p.tipo=='Pérdida de Equipos y/o implementos' else '&nbsp;')|safe
+                        }}</span>
+                </li>
+                <li><span>Daño a la Infraestructura</span> <span class="parens">{{ ('X' if p.tipo=='Daño a la
+                        Infraestructura' else '&nbsp;')|safe }}</span></li>
+                <li><span>Multa de tránsito</span> <span class="parens">{{ ('X' if p.tipo=='Multa de tránsito' else
+                        '&nbsp;')|safe }}</span></li>
+                <li><span>Otros</span> <span class="parens">{{ ('X' if p.tipo=='Otros' else '&nbsp;')|safe }}</span>
+                </li>
+            </ul>
+
+            {% if p.motivo_especifico %}
+            <p class="mt-6"><b>Motivo / Observación:</b> {{ p.motivo_especifico }}</p>
+            {% else %}
+            <p class="mt-6"><b>Motivo / Observación:</b></p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Cronograma -->
+    <div class="section cronograma">
+        <p class="cronograma-title"><b>La programación de los descuentos es como sigue:</b></p>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>N°</th>
+                    <th>Fecha de descuento (Mes y Año)</th>
+                    <th>Importe S/.</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in cuotas %}
+                <tr>
+                    <td>{{ c.orden }}</td>
+                    <td>{{ c.etiqueta }}</td>
+                    <td>S/ {{ '%.2f'|format(c.monto) }}</td>
+                </tr>
+                {% endfor %}
+                <tr>
+                    <th colspan="2" style="text-align:right;">TOTAL</th>
+                    <th>S/ {{ '%.2f'|format(p.monto_total) }}</th>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Política -->
+    <p class="small mt-12">
+        <b>Por el presente me comprometo a cumplir la siguiente política de la empresa:</b>
+        En el caso que el trabajador deje de laborar en la empresa, la deuda pendiente con CONTRANS será descontada
+        automáticamente de su liquidación de beneficios sociales, liquidaciones de pago de utilidades o de
+        cualquier otro concepto que esté pendiente de pago al suscrito.
+    </p>
+
+    <!-- Firmas horizontales -->
+    <div class="firmas-h">
+        <div class="sig-label">Firma del Trabajador</div>
+        <div class="sig-colon">:</div>
+        <div class="sig-line"></div>
+
+        <div class="sig-label">Firma del Jefe o Gerente de área</div>
+        <div class="sig-colon">:</div>
+        <div class="sig-line"></div>
+
+        <div class="sig-label">Vº Bº Jefe de Gestión del Talento</div>
+        <div class="sig-colon">:</div>
+        <div class="sig-line"></div>
+    </div>
+
+</body>
+
+</html>

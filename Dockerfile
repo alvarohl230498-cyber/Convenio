@@ -23,8 +23,13 @@ RUN python -m pip install --upgrade pip setuptools wheel && pip install -r requi
 
 COPY . /app
 
-RUN useradd -m appuser
+# >>> NUEVO: crea carpetas de salida y dáselas a appuser
+RUN mkdir -p /app/storage/prestamos /app/storage/exports && chown -R 1000:1000 /app
+# <<<
+
+RUN useradd -m appuser -u 1000
 USER appuser
 
 CMD bash -lc 'gunicorn "prototipo_convenios_vacaciones_app:create_app()" \
     --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120'
+

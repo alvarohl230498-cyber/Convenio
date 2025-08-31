@@ -9,11 +9,8 @@ from flask import (
     send_file, flash, make_response, Blueprint, abort, jsonify, Response
 )
 
-
-
 # (1) IMPORTA EL BLUEPRINT (arriba con tus otros imports)
 from prestamos import prestamos_bp
-import prestamos.routes 
 
 # IMPORTA modelos y utils
 from models import db, Empleado, PeriodoVacacional, MovimientoVacacional, Convenio
@@ -40,9 +37,12 @@ bp_convenios = Blueprint("convenios", __name__)
 
 
 def create_app():
+    """Factory para Gunicorn/Render."""
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-change-me')
+
     raw_url = os.getenv("DATABASE_URL", "sqlite:///database.db")
-    app.config['SQLALCHEMY_DATABASE_URI'] = normalize_db_url(raw_url)
+    database_url = normalize_db_url(raw_url)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
@@ -51,40 +51,23 @@ def create_app():
     def health():
         return {"status": "ok"}, 200
 
-    # registra el blueprint
-    app.register_blueprint(prestamos_bp, url_prefix="/")
-
-    # --- diagnóstico de rutas ---
-    @app.get("/__routes")
-    def __routes():
-        lines = []
-        for r in sorted(app.url_map.iter_rules(), key=lambda x: x.rule):
-            methods = ",".join(sorted(r.methods - {"HEAD","OPTIONS"}))
-            lines.append(f"{methods:10s} {r.rule}")
-        return "<pre>" + "\n".join(lines) + "</pre>"
-
-    # crea tablas
     with app.app_context():
-        import models as base_models
-        import prestamos.models
         db.create_all()
+        # Si deseas sembrar y reconciliar solo en local, puedes condicionar con env
         if os.getenv("SEED_ON_START", "1") == "1":
             seed_data()
             reconciliar_acumulacion_global()
 
-    return app   # ← ← ← AQUÍ, al final de create_app()
+    return app
 
+# (2) REGISTRA EL BLUEPRINT, justo después de crear la app
+app.register_blueprint(prestamos_bp, url_prefix="/")
 
-#!!!!!!!!!!!!!!
-# --- SOLO para ejecución local en Windows / Dev ---
-if __name__ == "__main__":
-    create_app()
-    app.run(
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", 5000)),
-        debug=True,
-        use_reloader=False   # ← evita doble inicialización en Windows
-    )
+# (3) SI NO USAS MIGRACIONES, CREA TABLAS NUEVAS
+with app.app_context():
+    import prestamos.models # asegura que SQLAlchemy cargue los modelos del módulo
+    db.create_all()
+
 
 # =========================================================
 # RUTAS (las mantengo tal cual estaban en tu prototipo)
@@ -850,3 +833,19 @@ def fecha_pe(value):
     except Exception:
         return str(value)
 
+
+# Local: correr directo
+if __name__ == '__main__':
+    # Inicializa config local por si corres `python prototipo_convenios_vacaciones_app.py`
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-change-me')
+    raw_url = os.getenv("DATABASE_URL", "sqlite:///database.db")
+    app.config['SQLALCHEMY_DATABASE_URI'] = normalize_db_url(raw_url)
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+    db.init_app(app)
+    with app.app_context():
+        db.create_all()
+        seed_data()
+        reconciliar_acumulacion_global()
+
+    app.run(debug=True)
