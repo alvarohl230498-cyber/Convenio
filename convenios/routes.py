@@ -10,7 +10,7 @@ convenios_bp = Blueprint("convenios", __name__, url_prefix="/convenios")
 @convenios_bp.get("/", endpoint="index")
 @login_required
 def index_convenios():
-    return redirect(url_for("convenios.list_employees"))
+    return redirect(url_for("index.html"))
 
 # LISTA DE EMPLEADOS (el endpoint que usan tus HTML)
 @convenios_bp.get("/empleados", endpoint="list_employees")

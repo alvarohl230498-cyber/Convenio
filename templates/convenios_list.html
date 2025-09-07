@@ -9,14 +9,14 @@
             <i class="bi bi-chevron-left"></i> Inicio
         </a>
         <!-- Antes: url_for('convenio_datos') -> exigía empleado_id y reventaba -->
-        <a href="{{ url_for('convenios.list_employees') }}" class="btn btn-primary btn-wide"
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-wide"
             title="Seleccione un colaborador para crear el convenio">
             <i class="bi bi-file-earmark-plus"></i> Nuevo convenio
         </a>
     </div>
 </div>
 
-<form class="row g-2 mb-3" method="get" action="{{ url_for('convenios.index') }}">
+<form class="row g-2 mb-3" method="get" action="{{ url_for('index') }}">
     <div class="col-md-4">
         <input type="text" class="form-control" name="q" value="{{ request.args.get('q','') }}"
             placeholder="Buscar por nombre, DNI, tipo…">
@@ -49,7 +49,7 @@
         <div class="text-center text-muted py-5">
             <p class="mb-2">Aún no hay convenios que coincidan con el criterio.</p>
             <!-- Antes: url_for('convenio_datos') -> exigía empleado_id -->
-            <a class="btn btn-primary btn-wide" href="{{ url_for('convenios.list_employees') }}" title="Ir a empleados y crear convenio">
+            <a class="btn btn-primary btn-wide" href="{{ url_for('index') }}" title="Ir a empleados y crear convenio">
                 Crear convenio
             </a>
         </div>

@@ -112,6 +112,11 @@ def create_app():
     @login_required
     def home():
         return render_template("home.html")
+    
+    @app.get("/",endpoint="index")
+    @login_required
+    def home():
+        return render_template("index.html")
 
     @app.get("/__routes")
     def __routes():
