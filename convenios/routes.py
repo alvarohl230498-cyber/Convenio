@@ -1,13 +1,14 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_required
-from models import Empleado, db
+from models import Empleado, db, Convenio
 
 convenios_bp = Blueprint("convenios", __name__, url_prefix="/convenios")
 
 
 # /convenios/  -> Lista de EMPLEADOS (index del módulo)
 
-@convenios_bp.get("",endpoint = "index")
+
+@convenios_bp.get("", endpoint="index")
 @convenios_bp.get("/", endpoint="index-slash")
 @login_required
 def empleados_index():
@@ -28,6 +29,47 @@ def convenios_list():
 @login_required
 def list_employees_alias():
     return empleados_index()
+
+
+# 2) /convenios/lista -> Lista de CONVENIOS (la tabla con los botones PDF)
+@convenios_bp.get("/lista", endpoint="list")
+@login_required
+def convenios_list():
+    # mismo orden seguro que usabas en el app principal
+    order_col = None
+    for candidate in ("fecha_solicitud", "created_at", "id"):
+        order_col = getattr(Convenio, candidate, None)
+        if order_col is not None:
+            break
+    convenios = (
+        Convenio.query.order_by(order_col.desc()).all()
+        if order_col
+        else Convenio.query.all()
+    )
+    return render_template("convenios_list.html", convenios=convenios)
+
+
+# 3) ALIAS dentro del blueprint para descargar el PDF de un convenio
+#    Redirige a la ruta global existente: descargar_convenio_pdf(convenio_id)
+@convenios_bp.post("/pdf/<int:convenio_id>", endpoint="descargar_pdf")
+@login_required
+def descargar_pdf(convenio_id):
+    # Pasamos la fecha del formulario (si existe) y abrimos en nueva pestaña
+    return redirect(
+        url_for("descargar_convenio_pdf", convenio_id=convenio_id, **request.form)
+    )
+
+
+# 4) (Opcional) ALIAS para el PDF por empleado (si alguna vista lo usa)
+@convenios_bp.post("/empleado/<int:empleado_id>/acumulacion/pdf", endpoint="acum_pdf")
+@login_required
+def acum_pdf(empleado_id):
+    return redirect(
+        url_for(
+            "generar_convenio_acumulacion_pdf", empleado_id=empleado_id, **request.form
+        )
+    )
+
 
 # /convenios/nuevo  -> Alta de empleado
 @convenios_bp.route("/nuevo", methods=["GET", "POST"], endpoint="new_employee")

@@ -45,7 +45,7 @@ def _seed_admin_if_empty():
     """Crea un admin inicial si la tabla 'users' está vacía (usa username)."""
     if User.query.count() == 0:
         username = os.getenv("ADMIN_USERNAME", "admin")
-        pwd = os.getenv("ADMIN_PASSWORD", "1234")
+        pwd = os.getenv("ADMIN_PASSWORD", "Admin$1234")
         admin = User(username=username, is_active=True)
         admin.set_password(pwd)
         db.session.add(admin)
