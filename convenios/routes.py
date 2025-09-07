@@ -17,11 +17,11 @@ def empleados_index():
 
 
 # /convenios/lista  -> Lista de CONVENIOS (otra vista diferente)
-@convenios_bp.get("/lista", endpoint="list")
-@login_required
-def convenios_list():
-    convenios = []  # TODO: trae tus convenios reales
-    return render_template("convenios_list.html", convenios=convenios)
+#@convenios_bp.get("/lista", endpoint="list")
+#@login_required
+#def convenios_list():
+#    convenios = []  # TODO: trae tus convenios reales
+#    return render_template("convenios_list.html", convenios=convenios)
 
 
 # ✅ ALIAS para compatibilidad con las plantillas antiguas
