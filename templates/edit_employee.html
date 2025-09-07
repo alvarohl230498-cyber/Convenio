@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-    <a href="{{ url_for('view_employee', empleado_id=empleado.id) }}">&larr; Volver</a>
+    <a href="{{ url_for('convenios.view_employee', empleado_id=empleado.id) }}">&larr; Volver</a>
     <h3 class="mt-2">Editar Empleado</h3>
     <form method="post" class="row g-2">
         <div class="col-md-3"><input class="form-control" name="dni" value="{{ empleado.dni }}" required></div>
