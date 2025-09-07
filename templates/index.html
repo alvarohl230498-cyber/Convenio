@@ -14,7 +14,7 @@
                 <!-- Convenios: SIN endpoint, ruta literal (como estaba antes) -->
                 <li class="nav-item">
                     <a class="nav-link {{ 'active' if request.path.startswith('/convenios') else '' }}"
-                        href="/convenios">
+                        href="{{ url_for('convenios.list_employees') }}">
                         Convenios
                     </a>
                 </li>
