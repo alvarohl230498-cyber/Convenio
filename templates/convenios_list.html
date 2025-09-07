@@ -119,7 +119,7 @@
                     <div class="modal fade" id="modalPDF{{ c.id }}" tabindex="-1" aria-hidden="true">
                         <div class="modal-dialog">
                             <form class="modal-content" method="POST"
-                                action="{{ url_for('convenios.descargar_convenio_pdf', convenio_id=c.id) }}" target="_blank">
+                                action="{{ url_for('descargar_convenio_pdf', convenio_id=c.id) }}" target="_blank">
                                 <div class="modal-header">
                                     <h5 class="modal-title">Fecha de firma</h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
