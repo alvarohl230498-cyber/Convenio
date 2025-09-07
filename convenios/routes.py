@@ -6,8 +6,9 @@ convenios_bp = Blueprint("convenios", __name__, url_prefix="/convenios")
 
 
 # /convenios/  -> Lista de EMPLEADOS (index del módulo)
-@convenios_bp.get("/", endpoint="index")
-@convenios_bp.get("") 
+
+@convenios_bp.get("",endpoint = "index")
+@convenios_bp.get("/", endpoint="index-slash")
 @login_required
 def empleados_index():
     empleados = Empleado.query.order_by(Empleado.nombre).all()
