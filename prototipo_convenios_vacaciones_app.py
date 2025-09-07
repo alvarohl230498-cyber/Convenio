@@ -108,7 +108,7 @@ def create_app():
     def health():
         return {"status": "ok"}, 200
 
-    @app.get("/")
+    @app.get("/",endpoint="home")
     @login_required
     def home():
         return render_template("home.html")
