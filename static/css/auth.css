@@ -1,0 +1,12 @@
+.min-vh-70 { min-height: 70vh; }
+.brand-circle {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+  color: #fff; font-weight: 700; font-size: 1.25rem;
+}
+.brand-initials { letter-spacing: 1px; }
+.form-control { border-radius: .6rem; }
+.btn { border-radius: .6rem; }
+.card { border-radius: 1rem; }

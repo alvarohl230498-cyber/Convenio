@@ -1,6 +1,32 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
 db = SQLAlchemy()
+
+
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    # Si tu columna en BD se llama EXACTAMENTE 'password_hash', deja así:
+    password_hash = db.Column(db.String(255), nullable=False)
+
+    # Si en tu BD la columna se llama 'password' y NO 'password_hash',
+    # usa esta línea en su lugar y comenta la de arriba:
+    # password_hash = db.Column('password', db.String(255), nullable=False)
+
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # helpers
+    def set_password(self, raw_password: str):
+        self.password_hash = generate_password_hash(raw_password)
+
+    def check_password(self, raw_password: str) -> bool:
+        return check_password_hash(self.password_hash, raw_password)
 
 
 class Empleado(db.Model):

@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Iniciar sesión · GP Vacaciones{% endblock %}
+{% block content %}
+<div class="row justify-content-center align-items-center min-vh-70">
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="card shadow-lg rounded-4 border-0">
+      <div class="card-body p-4">
+        <div class="text-center mb-3">
+          <div class="brand-circle mx-auto mb-2">
+            <span class="brand-initials">GP</span>
+          </div>
+          <h5 class="mb-0 fw-semibold">Acceso · Gestión de Vacaciones</h5>
+          <small class="text-muted">Use su usuario corporativo</small>
+        </div>
+
+        <!-- IMPORTANTE: autocomplete="on" para permitir password manager -->
+        <form method="post" action="{{ url_for('auth.login_post') }}" autocomplete="on">
+          <div class="mb-3">
+            <label for="username" class="form-label">Usuario</label>
+            <input type="text" class="form-control" id="username" name="username" value="{{ username or '' }}"
+              placeholder="usuario.corporativo" autocomplete="username" required>
+          </div>
+
+          <div class="mb-2">
+            <label for="password" class="form-label">Contraseña</label>
+            <input type="password" class="form-control" id="password" name="password" placeholder="••••••••"
+              autocomplete="current-password" required>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="form-check">
+              <!-- name + value para que se envíe al backend -->
+              <input class="form-check-input" type="checkbox" id="remember" name="remember" value="1" checked>
+              <label class="form-check-label text-muted" for="remember">Recordar</label>
+            </div>
+            <a class="small text-decoration-none" href="#"
+              onclick="alert('Solicite reinicio a TI / RRHH'); return false;">¿Olvidó su contraseña?</a>
+          </div>
+
+          <button class="btn btn-primary w-100 py-2 rounded-3" type="submit">Iniciar sesión</button>
+        </form>
+
+        <div class="text-center mt-3">
+          <small class="text-muted">© {{ 2025 }} Contrans · Gestión de Personas</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

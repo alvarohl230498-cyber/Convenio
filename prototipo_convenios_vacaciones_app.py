@@ -3,20 +3,18 @@ import io
 from datetime import datetime, date, timedelta
 from io import BytesIO
 from calendar import monthrange
-
+from flask_login import LoginManager, login_required
+from convenios.routes import convenios_bp
+from auth import auth_bp
 from flask import (
     Flask, render_template, request, redirect, url_for,
     send_file, flash, make_response, Blueprint, abort, jsonify, Response
 )
-
-
-
 # (1) IMPORTA EL BLUEPRINT (arriba con tus otros imports)
 from prestamos import prestamos_bp
 import prestamos.routes 
-
 # IMPORTA modelos y utils
-from models import db, Empleado, PeriodoVacacional, MovimientoVacacional, Convenio
+from models import db, Empleado, PeriodoVacacional, MovimientoVacacional, Convenio, User
 from utils import (
     normalize_db_url, fecha_literal, fecha_firma_literal, numero_a_letras,
     add_months, periodo_from_ingreso, verbo_por_bloque, sumar_dias, safe_date,
@@ -25,66 +23,117 @@ from utils import (
     rango_solapado, periodo_label, ventana_max_goce, partir_rango_por_bolsas   # <- ya importado
 )
 
+
 # =========================================================
 # APP (global) + FACTORY (para gunicorn)
 # =========================================================
-app = Flask(__name__)
+#app = Flask(__name__)
 
 # Helpers Jinja disponibles en plantillas
-app.jinja_env.globals.update(
-    fecha_literal=fecha_literal,
-    numero_a_letras=numero_a_letras,
-)
 
 bp_convenios = Blueprint("convenios", __name__)
 
+def _seed_admin_if_empty():
+    """Crea un admin inicial si la tabla 'users' está vacía (usa username)."""
+    if User.query.count() == 0:
+        import os
+        username = os.getenv("ADMIN_USERNAME", "admin")
+        pwd = os.getenv("ADMIN_PASSWORD", "Admin$1234")
+
+        admin = User(username=username, is_active=True)
+        admin.set_password(pwd)
+        db.session.add(admin)
+        db.session.commit()
+        print(f"Usuario administrador creado: {username}")
+
+from datetime import timedelta
 
 def create_app():
+    app = Flask(__name__)
+    app.jinja_env.globals.update(
+        fecha_literal=fecha_literal,
+        numero_a_letras=numero_a_letras,
+    )
+
+    # ======================
+    # CONFIG GENERAL
+    # ======================
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-change-me')
     raw_url = os.getenv("DATABASE_URL", "sqlite:///database.db")
-    app.config['SQLALCHEMY_DATABASE_URI'] = normalize_db_url(raw_url)
+    app.config['SQLALCHEMY_DATABASE_URI'] = raw_url
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+    # ======================
+    # CONFIG LOGIN / REMEMBER ME
+    # ======================
+    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=30)
+    app.config["REMEMBER_COOKIE_HTTPONLY"] = True
+    app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
+    # ⚠️ En producción con HTTPS, activa:
+    # app.config["REMEMBER_COOKIE_SECURE"] = True
+
+    # ======================
+    # INIT DB
+    # ======================
     db.init_app(app)
+    with app.app_context():
+        db.create_all()
+        _seed_admin_if_empty()
 
-    @app.get("/health")
-    def health():
-        return {"status": "ok"}, 200
+    # ======================
+    # LOGIN MANAGER
+    # ======================
+    login_manager = LoginManager(app)
+    login_manager.login_view = "auth.login_get"
+    login_manager.login_message = "Debes iniciar sesión para acceder."
 
-    # registra el blueprint
-    app.register_blueprint(prestamos_bp, url_prefix="/")
+    @login_manager.user_loader
+    def load_user(user_id: str):
+        try:
+            return User.query.get(int(user_id))
+        except Exception:
+            return None
 
-    # --- diagnóstico de rutas ---
+    # ======================
+    # BLUEPRINTS
+    # ======================
+    app.register_blueprint(auth_bp, url_prefix="/")
+    app.register_blueprint(prestamos_bp)
+    app.register_blueprint(convenios_bp)
+
+    # ======================
+    # RUTAS PRINCIPALES
+    # ======================
+    @app.get("/")
+    @login_required
+    def home():
+        from flask import render_template
+        return render_template("home.html")
+
     @app.get("/__routes")
     def __routes():
         lines = []
         for r in sorted(app.url_map.iter_rules(), key=lambda x: x.rule):
-            methods = ",".join(sorted(r.methods - {"HEAD","OPTIONS"}))
-            lines.append(f"{methods:10s} {r.rule}")
+            methods = ",".join(sorted(m for m in r.methods if m in {"GET","POST","PUT","DELETE"}))
+            lines.append(f"{r.rule:40s}  =>  {r.endpoint}  [{methods}]")
         return "<pre>" + "\n".join(lines) + "</pre>"
 
-    # crea tablas
-    with app.app_context():
-        import models as base_models
-        import prestamos.models
-        db.create_all()
-        if os.getenv("SEED_ON_START", "1") == "1":
-            seed_data()
-            reconciliar_acumulacion_global()
-
-    return app   # ← ← ← AQUÍ, al final de create_app()
+    return app
 
 
 #!!!!!!!!!!!!!!
 # --- SOLO para ejecución local en Windows / Dev ---
 if __name__ == "__main__":
-    create_app()
+    app = create_app()   # ✅ usa la app creada por la factory
     app.run(
         host="0.0.0.0",
         port=int(os.getenv("PORT", 5000)),
         debug=True,
-        use_reloader=False   # ← evita doble inicialización en Windows
+        use_reloader=False
     )
+
+
+
 
 # =========================================================
 # RUTAS (las mantengo tal cual estaban en tu prototipo)

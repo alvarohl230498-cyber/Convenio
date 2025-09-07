@@ -1,41 +1,45 @@
 {% extends "base.html" %}
+{% block title %}Convenios · Nuevo Colaborador{% endblock %}
 {% block content %}
 <div class="container mt-4">
     <h2 class="mb-4">➕ Crear Nuevo Colaborador</h2>
-    <form method="POST" action="{{ url_for('new_employee') }}" class="p-4 border rounded shadow-sm bg-light">
+
+    <form method="POST" action="{{ url_for('convenios.new_employee') }}" class="p-4 border rounded shadow-sm bg-light"
+        novalidate autocomplete="off">
 
         <div class="mb-3">
             <label for="dni" class="form-label">DNI</label>
             <input type="text" class="form-control text-uppercase" id="dni" name="dni" maxlength="12" required
-                oninput="this.value = this.value.toUpperCase();">
+                value="{{ request.form.get('dni','') }}" oninput="this.value=this.value.toUpperCase();">
         </div>
 
         <div class="mb-3">
             <label for="nombre" class="form-label">Nombre completo</label>
             <input type="text" class="form-control text-uppercase" id="nombre" name="nombre" required
-                oninput="this.value = this.value.toUpperCase();">
+                value="{{ request.form.get('nombre','') }}" oninput="this.value=this.value.toUpperCase();">
         </div>
 
         <div class="mb-3">
             <label for="cargo" class="form-label">Cargo</label>
             <input type="text" class="form-control text-uppercase" id="cargo" name="cargo"
-                oninput="this.value = this.value.toUpperCase();">
+                value="{{ request.form.get('cargo','') }}" oninput="this.value=this.value.toUpperCase();">
         </div>
 
         <div class="mb-3">
             <label for="direccion" class="form-label">Dirección</label>
             <input type="text" class="form-control text-uppercase" id="direccion" name="direccion"
-                oninput="this.value = this.value.toUpperCase();">
+                value="{{ request.form.get('direccion','') }}" oninput="this.value=this.value.toUpperCase();">
         </div>
 
         <div class="mb-3">
             <label for="fecha_ingreso" class="form-label">Fecha de ingreso</label>
             <input type="date" class="form-control" id="fecha_ingreso" name="fecha_ingreso" required
+                value="{{ request.form.get('fecha_ingreso','') }}"
                 title="Puedes pegar 28/10/2024, 28-10-2024, 28102024 o 2024-10-28" inputmode="numeric">
         </div>
 
         <div class="d-flex justify-content-between">
-            <a href="{{ url_for('index') }}" class="btn btn-secondary">⬅ Volver</a>
+            <a href="{{ url_for('convenios.list_employees') }}" class="btn btn-secondary">⬅ Volver</a>
             <button type="submit" class="btn btn-primary">💾 Guardar Colaborador</button>
         </div>
     </form>
@@ -52,42 +56,23 @@
 <script>
     (function () {
         const input = document.getElementById('fecha_ingreso');
-
         function normalizaFecha(str) {
             if (!str) return null;
-            str = String(str).trim();
-
-            // Unifica separadores: ., /, espacios -> -
-            str = str.replace(/[./\s]/g, '-');
-
-            // dd-mm-aaaa
+            str = String(str).trim().replace(/[./\s]/g, '-');
             let m = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
             if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-
-            // aaaa-mm-dd
             m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
             if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-
-            // ddmmaaaa (8 dígitos)
             m = str.match(/^(\d{2})(\d{2})(\d{4})$/);
             if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-
             return null;
         }
-
         if (input) {
-            // Pegar: transforma al vuelo
             input.addEventListener('paste', function (e) {
                 const txt = (e.clipboardData || window.clipboardData).getData('text');
                 const iso = normalizaFecha(txt);
-                if (iso) {
-                    e.preventDefault();
-                    input.value = iso;
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                }
+                if (iso) { e.preventDefault(); input.value = iso; input.dispatchEvent(new Event('change', { bubbles: true })); }
             });
-
-            // Salir del campo: intenta normalizar lo escrito
             input.addEventListener('blur', function (e) {
                 const iso = normalizaFecha(e.target.value);
                 if (iso) e.target.value = iso;
