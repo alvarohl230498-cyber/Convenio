@@ -8,13 +8,6 @@ convenios_bp = Blueprint("convenios", __name__, url_prefix="/convenios")
 
 
 # ===== Listado de empleados (para crear convenio) =====
-@convenios_bp.get("/empleados", endpoint="list_employees")
-@login_required
-def list_employees():
-    empleados = Empleado.query.all()
-    # Mantengo tu template tal cual lo estás usando
-    return render_template("convenios_list.html", empleados=empleados)
-
 
 # ===== Index de convenios =====
 @convenios_bp.get("/", endpoint="index")
@@ -22,7 +15,7 @@ def list_employees():
 def index_convenios():
     # TODO: ajusta la query si ya tienes modelo Convenio
     convenios = []
-    return render_template("index.html", convenios=convenios)
+    return render_template("convenios_list.html", convenios=convenios)
 
 
 # ===== Nuevo (GET/POST) =====
@@ -60,7 +53,7 @@ def new_employee():
         db.session.add(emp)
         db.session.commit()
         flash("Colaborador creado correctamente.", "success")
-        return redirect(url_for("convenios.list_employees"))
+        return redirect(url_for("list_employees"))
 
     return render_template("new_employee.html")
 
