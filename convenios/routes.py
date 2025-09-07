@@ -21,6 +21,12 @@ def convenios_list():
     return render_template("convenios_list.html", convenios=convenios)
 
 
+# ✅ ALIAS para compatibilidad con las plantillas antiguas
+@convenios_bp.get("/empleados", endpoint="list_employees")
+@login_required
+def list_employees_alias():
+    return empleados_index()
+
 # /convenios/nuevo  -> Alta de empleado
 @convenios_bp.route("/nuevo", methods=["GET", "POST"], endpoint="new_employee")
 @login_required

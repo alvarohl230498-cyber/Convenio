@@ -15,7 +15,6 @@ from flask_login import LoginManager, login_required
 from auth import auth_bp
 from convenios.routes import convenios_bp
 from prestamos import prestamos_bp
-import prestamos.routes  # asegura el registro interno si lo necesitas
 
 # Modelos y utils
 from models import db, Empleado, PeriodoVacacional, MovimientoVacacional, Convenio, User
