@@ -14,7 +14,7 @@ convenios_bp = Blueprint("convenios", __name__, url_prefix="/convenios")
 @login_required
 def index_convenios():
 
-    return render_template("convenios_list_employees.html")
+    return render_template("convenios_list.html")
 
 
 # ===== Nuevo (GET/POST) =====

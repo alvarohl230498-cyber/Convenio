@@ -5,11 +5,11 @@
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h1 class="h4 mb-0">Convenios</h1>
     <div class="d-flex gap-2">
-        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+        <a href="{{ url_for('home') }}" class="btn btn-outline-secondary">
             <i class="bi bi-chevron-left"></i> Inicio
         </a>
         <!-- Antes: url_for('convenio_datos') -> exigía empleado_id y reventaba -->
-        <a href="{{ url_for('index') }}" class="btn btn-primary btn-wide"
+        <a href="{{ url_for('list_employees') }}" class="btn btn-primary btn-wide"
             title="Seleccione un colaborador para crear el convenio">
             <i class="bi bi-file-earmark-plus"></i> Nuevo convenio
         </a>

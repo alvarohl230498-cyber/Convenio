@@ -320,9 +320,9 @@ def inject_empresa():
 
 
 @app.route('/empleados')
-def index():
+def list_employees():
     empleados = Empleado.query.order_by(Empleado.nombre).all()
-    return render_template('index.html', empleados=empleados)
+    return render_template('empleados.html', empleados=empleados)
 
 
 # Alta empleado
