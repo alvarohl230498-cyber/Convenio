@@ -12,7 +12,7 @@
                 <!-- Convenios → SIEMPRE a la lista -->
                 <li class="nav-item">
                     <a class="nav-link {{ 'active' if request.path.startswith('/convenios') else '' }}"
-                        href="{{ url_for('convenios') }}">
+                        href="{{ url_for('convenios.list') }}">
                         Convenios
                     </a>
                 </li>
