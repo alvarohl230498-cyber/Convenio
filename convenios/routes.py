@@ -13,9 +13,8 @@ convenios_bp = Blueprint("convenios", __name__, url_prefix="/convenios")
 @convenios_bp.get("/", endpoint="index")
 @login_required
 def index_convenios():
-    # TODO: ajusta la query si ya tienes modelo Convenio
-    convenios = []
-    return render_template("convenios_list.html", convenios=convenios)
+
+    return render_template("convenios_list.html")
 
 
 # ===== Nuevo (GET/POST) =====

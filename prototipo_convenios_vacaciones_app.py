@@ -320,9 +320,9 @@ def inject_empresa():
 
 
 @app.route('/empleados')
-def list_employees():
+def index():
     empleados = Empleado.query.order_by(Empleado.nombre).all()
-    return render_template('empleados.html', empleados=empleados)
+    return render_template('index.html', empleados=empleados)
 
 
 # Alta empleado
@@ -356,6 +356,7 @@ def delete_employee(empleado_id):
     return redirect(url_for('index'))
 
 @app.route("/convenios")
+@login_required
 def convenios_list():
     # fallback seguro de ordenamiento para evitar errores por columnas inexistentes
     order_col = None
