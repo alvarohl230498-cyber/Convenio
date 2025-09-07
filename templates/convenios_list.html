@@ -16,7 +16,7 @@
     </div>
 </div>
 
-<form class="row g-2 mb-3" method="get" action="{{ url_for('index') }}">
+<form class="row g-2 mb-3" method="get" action="{{ url_for('convenios.index') }}">
     <div class="col-md-4">
         <input type="text" class="form-control" name="q" value="{{ request.args.get('q','') }}"
             placeholder="Buscar por nombre, DNI, tipo…">

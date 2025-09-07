@@ -15,6 +15,7 @@ from flask_login import LoginManager, login_required
 from auth import auth_bp
 from convenios.routes import convenios_bp
 from prestamos import prestamos_bp
+import prestamos.routes  # asegura el registro interno si lo necesitas
 
 # Modelos y utils
 from models import db, Empleado, PeriodoVacacional, MovimientoVacacional, Convenio, User
@@ -112,6 +113,10 @@ def create_app():
     def home():
         return render_template("home.html")
     
+    @app.get("/",endpoint="index")
+    @login_required
+    def index():
+        return render_template("index.html")
 
     @app.get("/__routes")
     def __routes():
