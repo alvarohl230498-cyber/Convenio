@@ -2,90 +2,94 @@ import os
 import io
 from datetime import datetime, date, timedelta
 from io import BytesIO
+from dotenv import load_dotenv
 from calendar import monthrange
-from flask_login import LoginManager, login_required
-from convenios.routes import convenios_bp
-from auth import auth_bp
+
 from flask import (
     Flask, render_template, request, redirect, url_for,
     send_file, flash, make_response, Blueprint, abort, jsonify, Response
 )
-# (1) IMPORTA EL BLUEPRINT (arriba con tus otros imports)
+from flask_login import LoginManager, login_required
+
+# Blueprints
+from auth import auth_bp
+from convenios.routes import convenios_bp
 from prestamos import prestamos_bp
-import prestamos.routes 
-# IMPORTA modelos y utils
+import prestamos.routes  # asegura el registro interno si lo necesitas
+
+# Modelos y utils
 from models import db, Empleado, PeriodoVacacional, MovimientoVacacional, Convenio, User
 from utils import (
     normalize_db_url, fecha_literal, fecha_firma_literal, numero_a_letras,
     add_months, periodo_from_ingreso, verbo_por_bloque, sumar_dias, safe_date,
-    calcular_dias_truncos, calcular_vacaciones,
-    validar_solicitud, aplicar_goce, reconciliar_acumulacion_global, seed_data,
-    rango_solapado, periodo_label, ventana_max_goce, partir_rango_por_bolsas   # <- ya importado
+    calcular_dias_truncos, calcular_vacaciones, validar_solicitud, aplicar_goce,
+    reconciliar_acumulacion_global, seed_data, rango_solapado, periodo_label,
+    ventana_max_goce, partir_rango_por_bolsas
 )
 
-
 # =========================================================
-# APP (global) + FACTORY (para gunicorn)
+# APP GLOBAL (necesaria para que funcionen tus @app.route)
 # =========================================================
-#app = Flask(__name__)
+app = Flask(__name__)
 
-# Helpers Jinja disponibles en plantillas
+# Si necesitas helpers Jinja globales:
+app.jinja_env.globals.update(
+    fecha_literal=fecha_literal,
+    fecha_firma_literal=fecha_firma_literal,
+    numero_a_letras=numero_a_letras,
+)
 
-bp_convenios = Blueprint("convenios", __name__)
-
+# ---------------------------------------------------------
+# Admin de semilla (local a este módulo)
+# ---------------------------------------------------------
 def _seed_admin_if_empty():
     """Crea un admin inicial si la tabla 'users' está vacía (usa username)."""
     if User.query.count() == 0:
-        import os
         username = os.getenv("ADMIN_USERNAME", "admin")
         pwd = os.getenv("ADMIN_PASSWORD", "Admin$1234")
-
         admin = User(username=username, is_active=True)
         admin.set_password(pwd)
         db.session.add(admin)
         db.session.commit()
-        print(f"Usuario administrador creado: {username}")
+        print(f"[SEED] Usuario administrador creado: {username}")
 
-from datetime import timedelta
-
+# =========================================================
+# FACTORY: configura la 'app' global y la devuelve
+# =========================================================
 def create_app():
-    app = Flask(__name__)
-    app.jinja_env.globals.update(
-        fecha_literal=fecha_literal,
-        numero_a_letras=numero_a_letras,
-    )
+    """
+    Configura la instancia global `app` (que usan tus @app.route).
+    Protegida contra doble inicialización.
+    """
+    load_dotenv()
 
-    # ======================
-    # CONFIG GENERAL
-    # ======================
+    if app.config.get("_INIT_DONE"):
+        return app
+
+    # ---------- Config general ----------
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-change-me')
     raw_url = os.getenv("DATABASE_URL", "sqlite:///database.db")
-    app.config['SQLALCHEMY_DATABASE_URI'] = raw_url
+    app.config['SQLALCHEMY_DATABASE_URI'] = normalize_db_url(raw_url)
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-    # ======================
-    # CONFIG LOGIN / REMEMBER ME
-    # ======================
-    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=30)
+    # ---------- Remember cookie ----------
+    app.config["REMEMBER_COOKIE_DURATION"] = timedelta(days=int(os.getenv("REMEMBER_DAYS", 30)))
     app.config["REMEMBER_COOKIE_HTTPONLY"] = True
     app.config["REMEMBER_COOKIE_SAMESITE"] = "Lax"
-    # ⚠️ En producción con HTTPS, activa:
+    # En producción con HTTPS:
     # app.config["REMEMBER_COOKIE_SECURE"] = True
 
-    # ======================
-    # INIT DB
-    # ======================
+    # ---------- DB ----------
     db.init_app(app)
     with app.app_context():
         db.create_all()
-        _seed_admin_if_empty()
+        _seed_admin_if_empty()  # <- usa la función local
 
-    # ======================
-    # LOGIN MANAGER
-    # ======================
-    login_manager = LoginManager(app)
+    # ---------- Login Manager ----------
+    login_manager = LoginManager()
     login_manager.login_view = "auth.login_get"
     login_manager.login_message = "Debes iniciar sesión para acceder."
+    login_manager.init_app(app)
 
     @login_manager.user_loader
     def load_user(user_id: str):
@@ -94,20 +98,19 @@ def create_app():
         except Exception:
             return None
 
-    # ======================
-    # BLUEPRINTS
-    # ======================
+    # ---------- Blueprints ----------
     app.register_blueprint(auth_bp, url_prefix="/")
+    app.register_blueprint(convenios_bp)   # ya define su url_prefix internamente
     app.register_blueprint(prestamos_bp)
-    app.register_blueprint(convenios_bp)
 
-    # ======================
-    # RUTAS PRINCIPALES
-    # ======================
+    # ---------- Rutas base ----------
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}, 200
+
     @app.get("/")
     @login_required
     def home():
-        from flask import render_template
         return render_template("home.html")
 
     @app.get("/__routes")
@@ -118,22 +121,15 @@ def create_app():
             lines.append(f"{r.rule:40s}  =>  {r.endpoint}  [{methods}]")
         return "<pre>" + "\n".join(lines) + "</pre>"
 
+    app.config["_INIT_DONE"] = True
     return app
 
-
-#!!!!!!!!!!!!!!
-# --- SOLO para ejecución local en Windows / Dev ---
+# ---------------------------------------------------------
+# Ejecución local
+# ---------------------------------------------------------
 if __name__ == "__main__":
-    app = create_app()   # ✅ usa la app creada por la factory
-    app.run(
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", 5000)),
-        debug=True,
-        use_reloader=False
-    )
-
-
-
+    create_app()
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True, use_reloader=False)
 
 # =========================================================
 # RUTAS (las mantengo tal cual estaban en tu prototipo)

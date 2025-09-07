@@ -120,9 +120,6 @@
                 <button type="button" class="btn btn-success" onclick="guardarYEmitir()">
                     Guardar y emitir PDF
                 </button>
-                <a href="{{ url_for('prestamos.export_excel') }}" class="btn btn-dark">
-                    Descargar Excel
-                </a>
             </div>
         </div>
     </form>
@@ -160,6 +157,12 @@
                         Reabrir (aperturar) un mes…
                     </button>
                 </div>
+                <div class="col-12 col-md-auto">
+                    <a href="{{ url_for('prestamos.export_excel') }}" class="btn btn-dark">
+                        Descargar Excel
+                    </a>
+                </div>
+
             </div>
             <div class="table-responsive">
                 <div id="gridPrestamos"></div>
