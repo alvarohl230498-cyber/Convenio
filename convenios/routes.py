@@ -6,11 +6,14 @@ from models import Empleado, db
 
 convenios_bp = Blueprint("convenios", __name__, url_prefix="/convenios")
 
-# Index: redirige SIEMPRE al listado de empleados (tu UI principal)
+
 @convenios_bp.get("/", endpoint="index")
 @login_required
 def index_convenios():
-    return redirect(url_for("index.html"))
+    empleados = Empleado.query.order_by(Empleado.nombre).all()
+    # Este es tu index de convenios (lista de empleados)
+    return render_template("index.html", empleados=empleados)
+
 
 # LISTA DE EMPLEADOS (el endpoint que usan tus HTML)
 @convenios_bp.get("/empleados", endpoint="list_employees")
@@ -19,6 +22,7 @@ def list_employees():
     empleados = Empleado.query.order_by(Empleado.nombre).all()
     # Tu tabla vive en templates/convenios_list.html y espera `empleados`
     return render_template("convenios_list.html", empleados=empleados, convenios=[])
+
 
 # NUEVO EMPLEADO (GET/POST)
 @convenios_bp.route("/nuevo", methods=["GET", "POST"], endpoint="new_employee")
@@ -46,7 +50,10 @@ def new_employee():
                 y, m, d = [int(x) for x in fecha_raw.split("-")]
                 emp.fecha_ingreso = date(y, m, d)
             except Exception:
-                flash("La fecha de ingreso no tiene un formato válido (aaaa-mm-dd).", "warning")
+                flash(
+                    "La fecha de ingreso no tiene un formato válido (aaaa-mm-dd).",
+                    "warning",
+                )
 
         db.session.add(emp)
         db.session.commit()
@@ -55,6 +62,7 @@ def new_employee():
         return redirect(url_for("convenios.list_employees"))
 
     return render_template("new_employee.html")
+
 
 # DETALLE EMPLEADO (usado por botón Ver)
 @convenios_bp.get("/empleados/<int:empleado_id>", endpoint="view_employee")
