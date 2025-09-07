@@ -318,7 +318,8 @@ def inject_empresa():
     }
 
 
-@app.route('/')
+
+@app.route('/empleados')
 def index():
     empleados = Empleado.query.order_by(Empleado.nombre).all()
     return render_template('index.html', empleados=empleados)
