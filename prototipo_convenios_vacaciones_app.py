@@ -113,11 +113,6 @@ def create_app():
     def home():
         return render_template("home.html")
     
-    @app.get("/",endpoint="index")
-    @login_required
-    def index():
-        return render_template("index.html")
-
     @app.get("/__routes")
     def __routes():
         lines = []
