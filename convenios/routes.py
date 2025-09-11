@@ -1,3 +1,4 @@
+# convenios/routes.py
 import io
 from datetime import datetime, date, timedelta
 from io import BytesIO
@@ -14,6 +15,8 @@ from flask import (
     Response,
 )
 from flask_login import login_required
+
+# IMPORTA el único blueprint definido en __init__.py
 from . import convenios_bp
 
 from models import db, Empleado, PeriodoVacacional, MovimientoVacacional, Convenio
@@ -134,12 +137,23 @@ def inject_empresa():
 # =============================
 
 
-# /convenios/  -> Lista de EMPLEADOS
+# =============================
+# Navegación / Listas
+# =============================
+
+
+# /convenios  (SIN slash)  -> Lista de EMPLEADOS (index.html)
 @convenios_bp.get("", endpoint="index")
+@login_required
+def empleados_home():
+    empleados = Empleado.query.order_by(Empleado.nombre).all()
+    return render_template("index.html", empleados=empleados)
+
+
+# /convenios/ (CON slash)  -> Lista de CONVENIOS (convenios_list.html)
 @convenios_bp.get("/", endpoint="index-slash")
 @login_required
 def convenios_index():
-    # Orden seguro (usa la primera columna disponible)
     order_col = None
     for candidate in ("fecha_solicitud", "created_at", "id"):
         order_col = getattr(Convenio, candidate, None)
@@ -153,16 +167,14 @@ def convenios_index():
     return render_template("convenios_list.html", convenios=convenios)
 
 
-# (Opcional) soporte legacy si alguien entra a /convenios/lista -> redirige a /convenios
+# Legacy: /convenios/lista -> redirige a /convenios/
 @convenios_bp.get("/lista", endpoint="list_legacy")
 @login_required
 def convenios_list_legacy():
-    return redirect(url_for("convenios.index"))
+    return redirect(url_for("convenios.index-slash"))
 
 
-# =========================================================
-# 2) /convenios/empleados  -> LISTA DE EMPLEADOS
-# =========================================================
+# /convenios/empleados -> Lista de EMPLEADOS (alias adicional)
 @convenios_bp.get("/empleados", endpoint="employees")
 @convenios_bp.get("/empleados/", endpoint="employees-slash")
 @login_required
@@ -170,7 +182,8 @@ def empleados_index():
     empleados = Empleado.query.order_by(Empleado.nombre).all()
     return render_template("index.html", empleados=empleados)
 
-# Alias de compatibilidad (por si alguna plantilla antigua lo usa)
+
+# Alias legacy adicional
 @convenios_bp.get("/empleados/list", endpoint="list_employees")
 @login_required
 def list_employees_alias():
@@ -178,11 +191,10 @@ def list_employees_alias():
 
 
 # =============================
-# CRUD Empleado (en BP)
+# CRUD Empleado
 # =============================
 
 
-# Alta empleado
 @convenios_bp.route("/nuevo", methods=["GET", "POST"], endpoint="new_employee")
 @login_required
 def new_employee():
@@ -217,7 +229,6 @@ def new_employee():
     return render_template("new_employee.html")
 
 
-# Ver empleado
 @convenios_bp.get("/empleados/<int:empleado_id>", endpoint="view_employee")
 @login_required
 def view_employee(empleado_id):
@@ -235,7 +246,6 @@ def view_employee(empleado_id):
     )
 
 
-# Eliminar empleado
 @convenios_bp.post("/employee/<int:empleado_id>/delete", endpoint="delete_employee")
 @login_required
 def delete_employee(empleado_id):
@@ -251,7 +261,6 @@ def delete_employee(empleado_id):
 # =============================
 
 
-# Editar periodo
 @convenios_bp.post("/period/<int:periodo_id>/edit", endpoint="edit_period")
 @login_required
 def edit_period(periodo_id):
@@ -268,23 +277,19 @@ def edit_period(periodo_id):
     return redirect(url_for("convenios.view_employee", empleado_id=p.id_empleado))
 
 
-# Alta de periodo
 @convenios_bp.post("/employee/<int:empleado_id>/period/new", endpoint="new_period")
 @login_required
 def new_period(empleado_id):
     e = Empleado.query.get_or_404(empleado_id)
     periodo = request.form["periodo"].strip()  # "2024-2025"
     dias = int(request.form.get("dias_periodo", 30))
-
     try:
         anio_inicio, anio_fin = map(int, periodo.split("-"))
     except ValueError:
         flash("Formato de periodo inválido. Debe ser AAAA-AAAA.")
         return redirect(url_for("convenios.view_employee", empleado_id=e.id))
-
     fecha_inicio = e.fecha_ingreso.replace(year=anio_inicio)
     fecha_fin = fecha_inicio.replace(year=anio_fin) - timedelta(days=1)
-
     p = PeriodoVacacional(
         id_empleado=e.id,
         periodo=periodo,
@@ -295,11 +300,8 @@ def new_period(empleado_id):
         dias_pendientes=0,
         dias_truncos=0,
     )
-
     db.session.add(p)
     db.session.flush()
-
-    # Calcula truncos/pendientes al crear
     hoy = date.today()
     dias_ganados = calcular_dias_truncos(e.fecha_ingreso, hoy, fecha_inicio, fecha_fin)
     if dias_ganados >= dias:
@@ -308,8 +310,6 @@ def new_period(empleado_id):
     else:
         p.dias_pendientes = 0
         p.dias_truncos = dias_ganados
-
-    # Movimiento ALTA
     mov_alta = MovimientoVacacional(
         id_empleado=e.id,
         id_periodo=p.id,
@@ -319,13 +319,11 @@ def new_period(empleado_id):
         saldo_resultante=p.dias_pendientes,
     )
     db.session.add(mov_alta)
-
     db.session.commit()
     flash("Periodo vacacional agregado y movimiento ALTA registrado.")
     return redirect(url_for("convenios.view_employee", empleado_id=e.id))
 
 
-# Eliminar Periodo
 @convenios_bp.post("/period/<int:periodo_id>/delete", endpoint="delete_period")
 @login_required
 def delete_period(periodo_id):
@@ -337,7 +335,6 @@ def delete_period(periodo_id):
     return redirect(url_for("convenios.view_employee", empleado_id=empleado_id))
 
 
-# Ajuste manual de saldo del periodo
 @convenios_bp.post(
     "/employee/<int:empleado_id>/period/<int:periodo_id>/ajuste",
     endpoint="ajustar_periodo",
@@ -346,16 +343,12 @@ def delete_period(periodo_id):
 def ajustar_periodo(empleado_id, periodo_id):
     p = PeriodoVacacional.query.get_or_404(periodo_id)
     e = Empleado.query.get_or_404(empleado_id)
-    delta = int(request.form.get("delta_dias", 0))  # puede ser negativo
+    delta = int(request.form.get("delta_dias", 0))
     p.dias_pendientes = max(0, (p.dias_pendientes or 0) + delta)
     if delta < 0:
         p.dias_tomados = (p.dias_tomados or 0) + abs(delta)
     mov = MovimientoVacacional(
-        id_empleado=e.id,
-        id_periodo=p.id,
-        tipo="AJUSTE",
-        fecha=date.today(),
-        dias=delta,
+        id_empleado=e.id, id_periodo=p.id, tipo="AJUSTE", fecha=date.today(), dias=delta
     )
     db.session.add(mov)
     db.session.commit()
@@ -363,25 +356,20 @@ def ajustar_periodo(empleado_id, periodo_id):
     return redirect(url_for("convenios.view_employee", empleado_id=e.id))
 
 
-# Eliminar movimiento
 @convenios_bp.post("/movimiento/<int:id>/delete", endpoint="delete_movimiento")
 @login_required
 def delete_movimiento(id):
     mov = MovimientoVacacional.query.get_or_404(id)
     periodo = PeriodoVacacional.query.get(mov.id_periodo)
-
     db.session.delete(mov)
     db.session.commit()
-
     if periodo:
         movimientos_restantes = MovimientoVacacional.query.filter_by(
             id_periodo=periodo.id
         ).all()
-
         dias_tomados = 0
         dias_pendientes = periodo.dias_periodo
         dias_truncos = 0
-
         for m in movimientos_restantes:
             if m.tipo in ("GOCE", "SOLICITUD_VACACIONES"):
                 dias_tomados += abs(m.dias)
@@ -391,18 +379,15 @@ def delete_movimiento(id):
             elif m.tipo == "TRUNCO":
                 dias_truncos += abs(m.dias)
             elif m.tipo.startswith("Periodo vacacional"):
-                dias_pendientes = m.dias  # Resetea a días iniciales del periodo
-
+                dias_pendientes = m.dias
         periodo.dias_tomados = max(dias_tomados, 0)
         periodo.dias_pendientes = max(dias_pendientes, 0)
         periodo.dias_truncos = max(dias_truncos, 0)
         db.session.commit()
-
     flash("Movimiento eliminado y totales recalculados correctamente.")
     return redirect(url_for("convenios.view_employee", empleado_id=mov.id_empleado))
 
 
-# Editar movimiento
 @convenios_bp.post("/movimiento/<int:id>/edit", endpoint="edit_movimiento")
 @login_required
 def edit_movimiento(id):
@@ -419,7 +404,7 @@ def edit_movimiento(id):
 
 
 # =============================
-# JSON utilitario (datos para convenio)
+# JSON utilitario
 # =============================
 
 
@@ -454,11 +439,6 @@ def convenio_datos(empleado_id):
             },
         }
     )
-
-
-# =============================
-# Solicitud de Vacaciones (con lógica de Convenio)
-# =============================
 
 
 @convenios_bp.post(
