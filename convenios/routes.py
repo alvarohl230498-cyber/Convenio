@@ -138,24 +138,43 @@ def inject_empresa():
 @convenios_bp.get("", endpoint="index")
 @convenios_bp.get("/", endpoint="index-slash")
 @login_required
+def convenios_index():
+    # Orden seguro (usa la primera columna disponible)
+    order_col = None
+    for candidate in ("fecha_solicitud", "created_at", "id"):
+        order_col = getattr(Convenio, candidate, None)
+        if order_col is not None:
+            break
+    convenios = (
+        Convenio.query.order_by(order_col.desc()).all()
+        if order_col
+        else Convenio.query.all()
+    )
+    return render_template("convenios_list.html", convenios=convenios)
+
+
+# (Opcional) soporte legacy si alguien entra a /convenios/lista -> redirige a /convenios
+@convenios_bp.get("/lista", endpoint="list_legacy")
+@login_required
+def convenios_list_legacy():
+    return redirect(url_for("convenios.index"))
+
+
+# =========================================================
+# 2) /convenios/empleados  -> LISTA DE EMPLEADOS
+# =========================================================
+@convenios_bp.get("/empleados", endpoint="employees")
+@convenios_bp.get("/empleados/", endpoint="employees-slash")
+@login_required
 def empleados_index():
     empleados = Empleado.query.order_by(Empleado.nombre).all()
     return render_template("index.html", empleados=empleados)
 
-
-# /convenios/lista  -> Lista de CONVENIOS
-# /convenios/lista  -> Lista de CONVENIOS (otra vista diferente)
-@convenios_bp.get("/lista", endpoint="list")
-@login_required
-def convenios_list():
-    convenios = []  # TODO: trae tus convenios reales
-    return render_template("convenios_list.html", convenios=convenios)
-
-# Alias de compatibilidad (si alguna plantilla antigua lo usa)
-@convenios_bp.get("/empleados", endpoint="list_employees")
+# Alias de compatibilidad (por si alguna plantilla antigua lo usa)
+@convenios_bp.get("/empleados/list", endpoint="list_employees")
 @login_required
 def list_employees_alias():
-    return empleados_index()
+    return redirect(url_for("convenios.employees"))
 
 
 # =============================
