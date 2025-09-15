@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}Convenio de Adelanto de Vacaciones{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">Convenio de Adelanto de Vacaciones</h1>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{{ url_for('convenios.convenio_selector', empleado_id=emp.id) }}">
+            <i class="bi bi-chevron-left"></i> Volver a Convenios
+        </a>
+        <a class="btn btn-outline-secondary" href="{{ url_for('convenios.index') }}">
+            <i class="bi bi-people"></i> Empleados
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-6">
+                <h2 class="h5 mb-1">{{ emp.nombre }}</h2>
+                <div class="text-muted small">DNI: {{ emp.dni }}</div>
+                {% if periodo %}
+                <div class="mt-2">
+                    <span class="badge bg-secondary">Periodo (trunco): {{ periodo.periodo }}</span>
+                    <span class="badge bg-info text-dark">
+                        Truncos generados: <strong id="lblTruncos">{{ dias_truncos }}</strong> d
+                    </span>
+                </div>
+                {% else %}
+                <div class="alert alert-warning p-2 mt-2 mb-0">
+                    No se encontró un periodo vacacional activo para este colaborador.
+                </div>
+                {% endif %}
+            </div>
+            <div class="col-md-6 text-md-end">
+                <div class="small text-muted">Hoy: {{ hoy.strftime("%d/%m/%Y") }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Form principal (guardar histórico) ===== -->
+<form method="post" action="{{ url_for('convenios.adelanto_registrar', empleado_id=emp.id) }}" id="frmAdelanto"
+    class="needs-validation" novalidate>
+    <input type="hidden" name="periodo_id" value="{{ periodo.id if periodo else 0 }}">
+    <!-- Se mantiene el hidden y se agrega name al input visible -->
+    <input type="hidden" id="fecha_firma_iso" name="fecha_firma_iso" value="{{ hoy.isoformat() }}">
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label">Periodo trunco (aún no llega a 30 días)</label>
+            <input class="form-control" name="periodo_trunco" value="{{ periodo.periodo if periodo else '' }}" readonly>
+        </div>
+
+        <!-- Rango que se gozará -->
+        <div class="col-md-3">
+            <label class="form-label">Fecha inicio</label>
+            <input type="date" class="form-control" id="fi">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Fecha fin</label>
+            <input type="date" class="form-control" id="ff">
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Fechas en las que hará uso (literal)</label>
+            <div class="input-group">
+                <input class="form-control" id="fechas_uso" name="fechas_uso"
+                    placeholder="14 de septiembre del 2025 al 16 de septiembre del 2025" required>
+                <span class="input-group-text"><span class="badge bg-primary" id="chipDias">0 días</span></span>
+            </div>
+            <div class="form-text">El chip muestra los días calendario entre inicio y fin (incluye ambos).</div>
+        </div>
+
+        <div class="col-md-4">
+            <label class="form-label">Días generados a la fecha</label>
+            <input class="form-control" id="dias_generados" name="dias_generados" value="{{ dias_truncos }}" readonly>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Días de goce (adelanto)</label>
+            <input type="number" min="1" step="1" class="form-control" id="dias_goce" name="dias_goce" required>
+            <div class="form-text">No puede exceder los generados a la fecha.</div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Días que quedarían generados</label>
+            <input class="form-control" id="dias_restantes" name="dias_restantes" value="{{ dias_truncos }}" readonly>
+        </div>
+
+        <div class="col-md-6">
+            <label class="form-label">Fecha de firma</label>
+            <!-- ✅ agregado name="fecha_firma_iso" para que siempre viaje -->
+            <input type="date" class="form-control" id="fecha_firma" name="fecha_firma_iso"
+                value="{{ hoy.isoformat() }}" required>
+            <input type="hidden" name="fecha_firma_literal" id="fecha_firma_literal">
+            <div class="form-text">Se imprimirá en formato “30 de enero del 2025”.</div>
+        </div>
+
+        <div class="col-12 d-flex gap-2 mt-2">
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-save"></i> Guardar convenio
+            </button>
+            <button class="btn btn-outline-primary" type="button" id="btnPDF">
+                <i class="bi bi-filetype-pdf"></i> Generar PDF
+            </button>
+        </div>
+    </div>
+</form>
+
+<!-- ===== Form oculto solo para descargar PDF (desde el formulario) ===== -->
+<form id="pdfForm" method="POST" action="{{ url_for('convenios.adelanto_pdf', empleado_id=emp.id) }}" target="_blank"
+    class="d-none">
+    <input type="hidden" name="fechas_uso" id="pdf_fechas_uso">
+    <input type="hidden" name="dias_generados" id="pdf_dias_generados" value="{{ dias_truncos }}">
+    <input type="hidden" name="dias_goce" id="pdf_dias_goce">
+    <input type="hidden" name="dias_restantes" id="pdf_dias_restantes">
+    <input type="hidden" name="fecha_firma_literal" id="pdf_fecha_firma_literal">
+    <!-- Ya se enviaba la ISO al backend para el PDF -->
+    <input type="hidden" name="fecha_firma_iso" id="pdf_fecha_firma_iso">
+</form>
+
+<!-- ===== Historial de convenios de adelanto ===== -->
+<div class="card shadow-sm mt-4">
+    <div class="card-body">
+        <h2 class="h6 mb-3">Historial de Convenios de Adelanto</h2>
+
+        {# Construcción segura de la lista convenios_adelanto #}
+        {% set ns = namespace(items=[]) %}
+        {% for c in emp.convenios %}
+        {% if c.descripcion and 'adelanto' in c.descripcion|lower %}
+        {% set _ = ns.items.append(c) %}
+        {% endif %}
+        {% endfor %}
+        {% set convenios_adelanto = ns.items %}
+
+        {% if convenios_adelanto and convenios_adelanto|length > 0 %}
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="min-width:110px;">Fecha firma</th>
+                        <th>Periodo trunco</th>
+                        <th>Días generados</th>
+                        <th>Días de goce</th>
+                        <th>Días restantes</th>
+                        <th>Rango (fechas de uso)</th>
+                        <th style="width:220px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in convenios_adelanto|sort(attribute='fecha_firma', reverse=True) %}
+                    {% set gen = c.dias_acumulados or 0 %}
+                    {% set goce = c.dias_segundo or 0 %}
+                    {% set rest = gen - goce if gen - goce > 0 else 0 %}
+                    <tr>
+                        <td>{{ c.fecha_firma.strftime("%d/%m/%Y") if c.fecha_firma else "-" }}</td>
+                        <td>{{ c.periodo1 or "-" }}</td>
+                        <td>{{ gen }}</td>
+                        <td>{{ goce }}</td>
+                        <td>{{ rest }}</td>
+                        <td>{{ c.detalle_periodo1 or "-" }}</td>
+                        <td class="d-flex gap-1">
+                            <!-- Descargar PDF (fila) -->
+                            <form method="POST" action="{{ url_for('convenios.adelanto_pdf', empleado_id=emp.id) }}"
+                                target="_blank" class="d-inline">
+                                <input type="hidden" name="fechas_uso" value="{{ c.detalle_periodo1 or '' }}">
+                                <input type="hidden" name="dias_generados" value="{{ gen }}">
+                                <input type="hidden" name="dias_goce" value="{{ goce }}">
+                                <input type="hidden" name="dias_restantes" value="{{ rest }}">
+                                <input type="hidden" name="fecha_firma_literal"
+                                    value="{{ c.fecha_firma.strftime('%d de %B del %Y') if c.fecha_firma else '' }}">
+                                <!-- ISO desde el registro -->
+                                <input type="hidden" name="fecha_firma_iso"
+                                    value="{{ c.fecha_firma.isoformat() if c.fecha_firma else '' }}">
+                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-filetype-pdf"></i> Descargar PDF
+                                </button>
+                            </form>
+
+                            <!-- Eliminar -->
+                            <form method="POST"
+                                action="{{ url_for('convenios.adelanto_eliminar', empleado_id=emp.id, convenio_id=c.id) }}"
+                                class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar este convenio?');">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-trash"></i> Eliminar
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-muted small">Aún no hay convenios de adelanto registrados para este colaborador.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Utilidades de fecha
+    function toLiteral(iso) {
+        if (!iso) return '';
+        const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+        const d = new Date(iso + "T00:00:00");
+        return `${d.getDate()} de ${meses[d.getMonth()]} del ${d.getFullYear()}`;
+    }
+    function diffInclDays(aISO, bISO) {
+        if (!aISO || !bISO) return 0;
+        const a = new Date(aISO + "T00:00:00"), b = new Date(bISO + "T00:00:00");
+        const ms = (b - a); if (ms < 0) return 0;
+        return Math.floor(ms / 86400000) + 1;
+    }
+
+    // Controles del formulario nuevo
+    const fi = document.getElementById('fi');
+    const ff = document.getElementById('ff');
+    const chip = document.getElementById('chipDias');
+    const diasGoce = document.getElementById('dias_goce');
+    const diasGenerados = document.getElementById('dias_generados');
+    const diasRestantes = document.getElementById('dias_restantes');
+    const fechasUso = document.getElementById('fechas_uso');
+
+    function recompute() {
+        const n = diffInclDays(fi.value, ff.value);
+        if (n > 0) {
+            chip && (chip.textContent = `${n} ${n === 1 ? 'día' : 'días'}`);
+            diasGoce.value = n;
+            const gen = parseInt(diasGenerados.value || "0", 10);
+            diasRestantes.value = Math.max(gen - n, 0);
+            fechasUso.value = `${toLiteral(fi.value)} al ${toLiteral(ff.value)}`;
+        } else {
+            chip && (chip.textContent = "0 días");
+        }
+    }
+    fi && fi.addEventListener('change', recompute);
+    ff && ff.addEventListener('change', recompute);
+
+    diasGoce && diasGoce.addEventListener('input', () => {
+        const gen = parseInt(diasGenerados.value || "0", 10);
+        const g = parseInt(diasGoce.value || "0", 10);
+        if (g > gen) diasGoce.value = gen;
+        diasRestantes.value = Math.max(gen - (parseInt(diasGoce.value || "0", 10)), 0);
+    });
+
+    // Firma
+    const ffirma = document.getElementById('fecha_firma');
+    const ffirmaIsoHidden = document.getElementById('fecha_firma_iso'); // hidden del form principal
+    const ffirmaLit = document.getElementById('fecha_firma_literal');
+    function syncFirma() {
+        if (!ffirma) return;
+        // Sincroniza hidden y literal
+        ffirmaIsoHidden.value = ffirma.value;
+        ffirmaLit.value = toLiteral(ffirma.value);
+    }
+    ffirma && ffirma.addEventListener('change', syncFirma);
+    syncFirma();
+
+    // Generar PDF desde el formulario (nuevo convenio sin guardar)
+    document.getElementById('btnPDF')?.addEventListener('click', () => {
+        document.getElementById('pdf_fechas_uso').value = (fechasUso.value || '').trim();
+        document.getElementById('pdf_dias_generados').value = diasGenerados.value || 0;
+        document.getElementById('pdf_dias_goce').value = diasGoce.value || 0;
+        document.getElementById('pdf_dias_restantes').value = diasRestantes.value || 0;
+        document.getElementById('pdf_fecha_firma_literal').value = ffirmaLit.value || '';
+        // ISO al form oculto
+        document.getElementById('pdf_fecha_firma_iso').value = ffirma.value || '';
+        document.getElementById('pdfForm').submit();
+    });
+</script>
+{% endblock %}

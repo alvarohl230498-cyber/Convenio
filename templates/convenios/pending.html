@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }}{% endblock %}
+{% block content %}
+<div class="alert alert-info d-flex align-items-center" role="alert">
+    <i class="bi bi-info-circle me-2"></i>
+    <div>Vista de <strong>{{ titulo }}</strong> lista para conectar. Empleado ID: {{ empleado_id }}.</div>
+</div>
+
+<a class="btn btn-secondary" href="{{ url_for('convenios.convenio_selector', empleado_id=empleado_id) }}">
+    ← Volver a Convenios
+</a>
+{% endblock %}

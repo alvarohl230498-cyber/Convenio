@@ -5,7 +5,7 @@
 <div class="container mt-4">
     <h1>Detalle del colaborador</h1>
     <div class="d-flex gap-2 mb-3">
-        <a href="{{ url_for('convenios.index') }}" class="btn btn-secondary">← Volver al inicio</a>
+        <a href="{{ url_for('convenios.convenio_selector',empleado_id=empleado.id) }}" class="btn btn-secondary">← Volver al inicio</a>
     </div>
 
     <div class="card shadow-sm mb-4">
@@ -117,6 +117,9 @@
                     <label class="form-label">Fecha Fin</label>
                     <input type="date" name="fin" id="vac-fin" class="form-control" required
                         title="Puedes pegar 28/10/2024, 28-10-2024, 28102024 o 2024-10-28">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <span class="badge bg-primary" id="emp_chip">0 días</span>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Observaciones</label>
@@ -299,39 +302,36 @@
 {{ super() }}
 <script>
     (function () {
+        // ---------- Normalización de fechas pegadas o tipeadas ----------
         const inputs = [document.getElementById('vac-inicio'), document.getElementById('vac-fin')];
+
+        function pad2(v) { v = String(v || ''); return v.length === 1 ? '0' + v : v; }
         function normalizaFecha(str) {
             if (!str) return null;
             str = String(str).trim().replace(/[./\s]/g, '-');
             let m = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-            if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+            if (m) return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
             m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-            if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+            if (m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
             m = str.match(/^(\d{2})(\d{2})(\d{4})$/);
-            if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+            if (m) return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;
             return null;
         }
+
         inputs.forEach(input => {
             if (!input) return;
             input.addEventListener('paste', function (e) {
                 const txt = (e.clipboardData || window.clipboardData).getData('text');
                 const iso = normalizaFecha(txt);
-                if (iso) { e.preventDefault(); input.value = iso; input.dispatchEvent(new Event('change', { bubbles: true })); }
+                if (iso) { e.preventDefault(); input.value = iso; input.dispatchEvent(new Event('input', { bubbles: true })); }
             });
             input.addEventListener('blur', function (e) {
                 const iso = normalizaFecha(e.target.value);
                 if (iso) e.target.value = iso;
             });
         });
-        document.addEventListener('shown.bs.modal', function (evt) {
-            const modal = evt.target;
-            const dateInput = modal ? modal.querySelector('.fecha-firma-input') : null;
-            if (dateInput && !dateInput.value) {
-                const hoy = new Date();
-                const y = hoy.getFullYear(), m = String(hoy.getMonth() + 1).padStart(2, '0'), d = String(hoy.getDate()).padStart(2, '0');
-                dateInput.value = `${y}-${m}-${d}`;
-            }
-        });
+
+        // ---------- Botón con spinner al enviar formularios ----------
         document.addEventListener('submit', function (e) {
             const btn = e.target.querySelector('button[data-loading="true"]');
             if (!btn) return;
@@ -342,5 +342,40 @@
             btn.disabled = true;
         }, true);
     })();
+
+    // ---------- Cálculo de días (incluye ambos extremos) en UTC ----------
+    function empDiff(aISO, bISO) {
+        if (!aISO || !bISO) return 0;
+        const [ay, am, ad] = aISO.split('-').map(n => parseInt(n, 10));
+        const [by, bm, bd] = bISO.split('-').map(n => parseInt(n, 10));
+        if ([ay, am, ad, by, bm, bd].some(isNaN)) return 0;
+        const A = Date.UTC(ay, am - 1, ad);
+        const B = Date.UTC(by, bm - 1, bd);
+        const ms = B - A;
+        if (ms < 0) return 0;
+        return Math.floor(ms / 86400000) + 1;
+    }
+
+    // ⚠️ Usa los IDs reales de tu HTML
+    const empFi = document.getElementById('vac-inicio');
+    const empFf = document.getElementById('vac-fin');
+    const empChip = document.getElementById('emp_chip');
+
+    function upd() {
+        if (!empFi || !empFf || !empChip) return;
+        const n = empDiff(empFi.value, empFf.value);
+        empChip.textContent = `${n} ${n === 1 ? 'día' : 'días'}`;
+    }
+
+    // Recalcular en change + input y al cargar la página
+    if (empFi && empFf) {
+        empFi.addEventListener('change', upd);
+        empFf.addEventListener('change', upd);
+        empFi.addEventListener('input', upd);
+        empFf.addEventListener('input', upd);
+        document.addEventListener('DOMContentLoaded', upd);
+        // Si ya hay valores por servidor, dispara una vez
+        upd();
+    }
 </script>
 {% endblock %}

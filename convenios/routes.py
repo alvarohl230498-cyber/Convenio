@@ -15,6 +15,7 @@ from flask import (
     Response,
 )
 from flask_login import login_required
+from weasyprint import HTML
 
 # IMPORTA el único blueprint definido en __init__.py
 from . import convenios_bp
@@ -130,11 +131,6 @@ def inject_empresa():
             "lugar_firma": "Lima",
         }
     }
-
-
-# =============================
-# Navegación / Listas
-# =============================
 
 
 # =============================
@@ -607,13 +603,20 @@ def generar_convenio(id):
 )
 @login_required
 def generar_convenio_acumulacion_pdf(empleado_id: int):
-    from weasyprint import HTML
+    from weasyprint import HTML as _HTML
+    import re
 
     e = Empleado.query.get_or_404(empleado_id)
 
+    # === Fecha de firma: prioriza ISO del form ===
+    raw_iso = (
+        request.form.get("fecha_firma_iso") or request.form.get("fecha_firma") or ""
+    ).strip()
     try:
-        firma = datetime.strptime(request.form["fecha_firma"], "%Y-%m-%d").date()
+        firma = datetime.strptime(raw_iso, "%Y-%m-%d").date() if raw_iso else None
     except Exception:
+        firma = None
+    if not firma:
         abort(400, description="fecha_firma inválida")
 
     p1_str, p1_inicio, p1_fin = periodo_from_ingreso(e.fecha_ingreso, 1)
@@ -734,14 +737,18 @@ def generar_convenio_acumulacion_pdf(empleado_id: int):
         firma={"fecha": firma, "fecha_larga": fecha_firma_literal(firma)},
     )
 
-    from weasyprint import HTML as _HTML
-
     pdf_io = io.BytesIO()
     _HTML(string=html, base_url=request.host_url).write_pdf(pdf_io)
     pdf_io.seek(0)
 
-    safe_nombre = (e.nombre or "Empleado").replace(" ", "_")
-    filename = f"Convenio_Acumulacion_{safe_nombre}_{firma.isoformat()}.pdf"
+    def _sanitize(s: str) -> str:
+        s = re.sub(r"\s+", "_", (s or "").strip())
+        return re.sub(r"[^A-Za-z0-9_\-]", "", s)
+
+    safe_nombre = _sanitize(e.nombre or "Empleado")
+    fecha_base = raw_iso if raw_iso else firma.isoformat()
+    filename = f"{_sanitize(fecha_base)}_Convenio_Acumulacion_{safe_nombre}.pdf"
+
     return send_file(
         pdf_io, mimetype="application/pdf", as_attachment=True, download_name=filename
     )
@@ -849,6 +856,8 @@ def convenio_pdf(convenio_id):
         mimetype="application/pdf",
     )
 
+#!###########################DESCARGA CONVENIO##################################
+
 
 @convenios_bp.route(
     "/descargar_convenio_pdf/<int:convenio_id>",
@@ -858,11 +867,12 @@ def convenio_pdf(convenio_id):
 @login_required
 def descargar_convenio_pdf(convenio_id):
     from weasyprint import HTML
+    import re
 
     conv = Convenio.query.get_or_404(convenio_id)
     e = conv.empleado
 
-    raw_ff = request.values.get("fecha_firma")
+    raw_ff = (request.values.get("fecha_firma") or "").strip()
     if raw_ff:
         try:
             firma = datetime.strptime(raw_ff, "%Y-%m-%d").date()
@@ -907,9 +917,7 @@ def descargar_convenio_pdf(convenio_id):
     total_p1_bloques = sumar_dias(bloques_p1)
 
     remanentes_p1_de_este_convenio = sum(
-        abs(m.dias or 0)
-        for m in conv.movimientos
-        if m.tipo == "CONVENIO" and m.id_periodo == p1_db.id
+        abs(m.dias or 0) for m in conv.movimientos if m.tipo == "CONVENIO" and m.id_periodo == p1_db.id
     )
     if remanentes_p1_de_este_convenio:
         remanentes_p1 = remanentes_p1_de_este_convenio
@@ -938,13 +946,7 @@ def descargar_convenio_pdf(convenio_id):
             "lugar_firma": "Lima",
         },
         empleado=e,
-        p1={
-            "periodo": p1_db.periodo,
-            "inicio": p1_db.fecha_inicio,
-            "fin": p1_db.fecha_fin,
-            "bloques": bloques_p1,
-            "total": total_p1_bloques,
-        },
+        p1={"periodo": p1_db.periodo, "inicio": p1_db.fecha_inicio, "fin": p1_db.fecha_fin, "bloques": bloques_p1, "total": total_p1_bloques},
         p2={
             "periodo": p2_db.periodo,
             "inicio": p2_db.fecha_inicio,
@@ -960,12 +962,277 @@ def descargar_convenio_pdf(convenio_id):
     )
 
     pdf = HTML(string=html, base_url=request.host_url).write_pdf()
+
+    def _sanitize(s: str) -> str:
+        s = re.sub(r"\s+", "_", (s or "").strip())
+        return re.sub(r"[^A-Za-z0-9_\-]", "", s)
+
+    safe_nombre = _sanitize(e.nombre or "Empleado")
+    filename = f"{firma.isoformat()}_Convenio_Acumulacion_{safe_nombre}_{conv.id}.pdf"
+
     response = send_file(
         BytesIO(pdf),
         as_attachment=True,
-        download_name=f"convenio_{conv.id}_{firma.isoformat()}.pdf",
+        download_name=filename,
         mimetype="application/pdf",
     )
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     return response
+
+
+
+############################SELECTOR##################################
+
+
+# ===== Selector =====
+@convenios_bp.get("/empleados/<int:empleado_id>/convenios/nuevo")
+@login_required
+def convenio_selector(empleado_id: int):
+    empleado = Empleado.query.get_or_404(empleado_id)
+    return render_template("convenios/selector.html", empleado=empleado)
+
+
+# ===== Flujos (stubs) =====
+@convenios_bp.get("/acumulacion/nuevo")
+@login_required
+def nuevo_acumulacion():
+    empleado_id = request.args.get("empleado_id", type=int)
+    if not empleado_id:
+        flash("Selecciona un colaborador.", "warning")
+        return redirect(url_for("convenios.index"))
+    return redirect(url_for("convenios.view_employee", empleado_id=empleado_id))
+
+
+@convenios_bp.get("/adelanto/nuevo", endpoint="nuevo_adelanto")
+@login_required
+def nuevo_adelanto():
+    empleado_id = request.args.get("empleado_id", type=int)
+    if not empleado_id:
+        flash("Selecciona un colaborador.", "warning")
+        return redirect(url_for("convenios.index"))
+    return redirect(url_for("convenios.adelanto_form", empleado_id=empleado_id))
+
+
+########Funcion de adelanto########
+
+
+@convenios_bp.get("/adelanto/<int:empleado_id>", endpoint="adelanto_form")
+@login_required
+def adelanto_form(empleado_id):
+    from sqlalchemy import func  # ⬅️ IMPORT local
+
+    emp = Empleado.query.get_or_404(empleado_id)
+
+    periodo = (
+        PeriodoVacacional.query.filter(PeriodoVacacional.id_empleado == empleado_id)
+        .order_by(PeriodoVacacional.fecha_inicio.desc())
+        .first()
+    )
+
+    dias_truncos = periodo.dias_truncos if periodo else 0
+    periodo_vacacional = periodo.periodo if periodo else ""
+
+    # ⬇️ Historial de convenios de adelanto
+    convenios_adelanto = (
+        Convenio.query.filter(
+            Convenio.id_empleado == empleado_id,
+            func.lower(Convenio.descripcion).ilike("%adelanto%"),
+        )
+        .order_by(Convenio.fecha_firma.desc().nullslast())
+        .all()
+    )
+
+    return render_template(
+        "convenios/adelanto_form.html",
+        emp=emp,
+        periodo=periodo,
+        dias_truncos=dias_truncos,
+        hoy=date.today(),
+        periodo_vacacional=periodo_vacacional,
+        convenios_adelanto=convenios_adelanto,  # ⬅️ se envía al template
+    )
+
+
+# ===== Adelanto: Guardar =====
+@convenios_bp.post("/adelanto/<int:empleado_id>", endpoint="adelanto_registrar")
+@login_required
+def adelanto_registrar(empleado_id):
+    emp = Empleado.query.get_or_404(empleado_id)
+
+    periodo_id = int(request.form.get("periodo_id", 0) or 0)
+    dias_generados = int(request.form.get("dias_generados", 0) or 0)
+    dias_goce = int(request.form.get("dias_goce", 0) or 0)
+    dias_restantes = int(request.form.get("dias_restantes", 0) or 0)
+    fechas_uso = (request.form.get("fechas_uso") or "").strip()
+
+    # Acepta varias claves: fecha_firma_iso (preferida) o fecha_firma
+    fecha_firma_iso = (
+        request.form.get("fecha_firma_iso") or request.form.get("fecha_firma") or ""
+    ).strip()
+    try:
+        fecha_firma = date.fromisoformat(fecha_firma_iso) if fecha_firma_iso else None
+    except ValueError:
+        fecha_firma = None
+    if not fecha_firma:
+        # Solo como último recurso usa "hoy"
+        fecha_firma = date.today()
+
+    periodo = (
+        PeriodoVacacional.query.filter(PeriodoVacacional.id_empleado == empleado_id)
+        .order_by(PeriodoVacacional.fecha_inicio.desc())
+        .first()
+    )
+
+    convenio = Convenio(
+        id_empleado=empleado_id,
+        fecha_firma=fecha_firma,  # ⬅️ se guarda la fecha correcta
+        fecha_solicitud=date.today(),
+        descripcion="Convenio de adelanto de días de descanso vacacional.",
+        dias_acumulados=dias_generados,
+        dias_segundo=dias_goce,
+        periodo1=periodo.periodo if periodo else None,
+        detalle_periodo1=fechas_uso,
+        estado_firma="Pendiente",
+    )
+
+    db.session.add(convenio)
+    db.session.commit()
+
+    flash("Convenio de Adelanto registrado. Puedes generar el PDF.", "success")
+    return redirect(url_for("convenios.adelanto_form", empleado_id=empleado_id))
+
+
+# ===== Adelanto: PDF =====
+@convenios_bp.post("/adelanto/<int:empleado_id>/pdf", endpoint="adelanto_pdf")
+@login_required
+def adelanto_pdf(empleado_id):
+    from weasyprint import HTML
+    from io import BytesIO
+    from flask import current_app
+    import os, base64, re
+    from datetime import date
+    from sqlalchemy import func  # para el fallback a la última fecha en DB
+
+    emp = Empleado.query.get_or_404(empleado_id)
+
+    # Convierte archivo estático a data URI (para que WeasyPrint lo embeba)
+    def data_uri_static(rel_path, mime="image/png"):
+        abs_path = os.path.join(
+            current_app.root_path, "static", rel_path.replace("/", os.sep)
+        )
+        with open(abs_path, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode("ascii")
+        return f"data:{mime};base64,{b64}"
+
+    # Periodo actual (para el texto del cuerpo)
+    per = (
+        PeriodoVacacional.query.filter(PeriodoVacacional.id_empleado == empleado_id)
+        .order_by(PeriodoVacacional.fecha_inicio.desc())
+        .first()
+    )
+    periodo_vacacional = per.periodo if per else ""
+
+    # ----------- datos que vienen del formulario -----------
+    dias_generados = int(request.form.get("dias_generados", 0) or 0)
+    dias_goce = int(request.form.get("dias_goce", 0) or 0)
+    dias_restantes = int(request.form.get("dias_restantes", 0) or 0)
+    fechas_uso = (request.form.get("fechas_uso") or "").strip()
+
+    # Puedes enviar cualquiera de estas; se prioriza ISO si llega
+    fecha_firma_literal_str = (request.form.get("fecha_firma_literal") or "").strip()
+    fecha_firma_iso_str = (
+        request.form.get("fecha_firma_iso") or request.form.get("fecha_firma") or ""
+    ).strip()
+
+    # Intento 1: parsear la ISO del form
+    firma_dt = None
+    if fecha_firma_iso_str:
+        try:
+            firma_dt = date.fromisoformat(fecha_firma_iso_str)
+        except ValueError:
+            firma_dt = None
+
+    # Intento 2: tomar la última fecha_firma de un convenio de "adelanto" del empleado
+    if not firma_dt:
+        ultimo_conv_adelanto = (
+            Convenio.query.filter(
+                Convenio.id_empleado == empleado_id,
+                func.lower(Convenio.descripcion).ilike("%adelanto%"),
+            )
+            .order_by(Convenio.fecha_firma.desc().nullslast(), Convenio.id.desc())
+            .first()
+        )
+        if ultimo_conv_adelanto and ultimo_conv_adelanto.fecha_firma:
+            firma_dt = ultimo_conv_adelanto.fecha_firma
+
+    # Último fallback: hoy (solo si no hubo manera de determinarla)
+    if not firma_dt:
+        firma_dt = date.today()
+    # -------------------------------------------------------
+
+    # Contexto para el HTML del PDF
+    ctx = {
+        "empresa": "CONTRANS S.A.C.",
+        "ruc": "20514842079",
+        "rep_nombre": "FRANCISCO JOSE GONZALEZ HURTADO",
+        "rep_dni": "20392952",
+        "nombre": emp.nombre,
+        "dni": emp.dni,
+        "dias_generados": dias_generados,
+        "dias_goce": dias_goce,
+        "dias_restantes": dias_restantes,
+        "fechas_uso": fechas_uso,
+        # Si no recibiste literal, el backend lo genera con tu helper
+        "fecha_firma_literal": fecha_firma_literal_str or fecha_firma_literal(firma_dt),
+        "periodo_vacacional": periodo_vacacional,
+        "firma_francisco_url": data_uri_static("imagenes/firma_de_francisco.png"),
+    }
+
+    # Render del HTML y generación del PDF
+    html = render_template("convenios/adelanto_pdf.html", **ctx)
+    pdf_bytes = HTML(string=html, base_url=request.url_root).write_pdf()
+
+    # ====== Nombre del archivo usando PRIORIDAD de fecha ======
+    # 1) ISO del form; 2) literal del form normalizado; 3) ISO de firma_dt (DB/fallback)
+    def sanitize(s: str) -> str:
+        s = re.sub(r"\s+", "_", s.strip())
+        return re.sub(r"[^A-Za-z0-9_\-]", "", s)
+
+    if fecha_firma_iso_str:
+        fecha_base = sanitize(fecha_firma_iso_str)
+    elif fecha_firma_literal_str:
+        fecha_base = sanitize(
+            fecha_firma_literal_str.replace(" del ", " ").replace(" de ", " ")
+        )
+    else:
+        fecha_base = sanitize(firma_dt.isoformat())
+
+    fname = f"{fecha_base}_Convenio_Adelanto_{emp.nombre.replace(' ', '_')}.pdf"
+    # =========================================================
+
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=fname,
+    )
+
+
+# ===== Adelanto: Eliminar =====
+@convenios_bp.post(
+    "/adelanto/<int:empleado_id>/<int:convenio_id>/eliminar",
+    endpoint="adelanto_eliminar",
+)
+@login_required
+def adelanto_eliminar(empleado_id, convenio_id):
+    convenio = Convenio.query.get_or_404(convenio_id)
+
+    if convenio.id_empleado != empleado_id:
+        abort(403)
+
+    db.session.delete(convenio)
+    db.session.commit()
+    flash("Convenio de Adelanto eliminado correctamente.", "success")
+
+    return redirect(url_for("convenios.adelanto_form", empleado_id=empleado_id))

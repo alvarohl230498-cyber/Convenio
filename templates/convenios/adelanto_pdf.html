@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <title>Convenio de Adelanto de Días de Descanso Vacacional</title>
+    <style>
+        @page {
+            size: A4;
+            margin-top: 1cm;
+            margin-right: 2.3cm;
+            margin-bottom: 1cm;
+            margin-left: 2.3cm;
+        }
+
+        body {
+            font-family: "Calibri", Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.35;
+            color: #000;
+        }
+
+        h1 {
+            font-size: 13pt;
+            text-align: center;
+            text-transform: uppercase;
+            margin: 0 0 12pt;
+        }
+
+        p {
+            margin: 0 0 10pt;
+            text-align: justify;
+        }
+
+        .negr {
+            font-weight: 700;
+        }
+
+        /* Tabla (recuadro) */
+        table.box {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12pt 0;
+            table-layout: fixed;
+            /* respeta 80/20 y evita saltos */
+        }
+
+        table.box th,
+        table.box td {
+            border: 1px solid #000;
+            vertical-align: middle;
+            padding: 4pt 6pt;
+            /* filas compactas */
+            font-size: 10.5pt;
+            line-height: 1.2;
+            word-break: break-word;
+            box-sizing: border-box;
+        }
+
+        table.box th {
+            text-transform: uppercase;
+            text-align: left;
+            font-weight: 700;
+        }
+
+        table.box td {
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>CONVENIO DE ADELANTO DE DÍAS DE DESCANSO VACACIONAL</h1>
+
+    <p>
+        Conste por el presente documento el Convenio de Adelanto de Días de Descanso Vacacional, que suscriben,
+        al amparo del Art. 10º del Decreto Legislativo Nº 713 (modificado por Decreto Legislativo Nº 1405), de una parte
+        la empresa <span class="negr">{{ empresa }}</span>, identificada con R.U.C. Nº <span class="negr">{{ ruc
+            }}</span>,
+        representada por su Gerente General, Señor <span class="negr">{{ rep_nombre }}</span>, identificado con DNI Nº
+        <span class="negr">{{ rep_dni }}</span>, con domicilio en Av. A N° 204, Ex Fundo Oquendo – Callao – Provincia
+        Constitucional del Callao (Alt. Km 8.5 Av. Néstor Gambetta – CALLAO), a quien en adelante se denominará
+        <span class="negr">EL EMPLEADOR</span>; y de la otra parte, el Señor(a) <span class="negr">{{ nombre }}</span>,
+        identificado con DNI Nº <span class="negr">{{ dni }}</span>, con domicilio en <span class="negr">{{ domicilio
+            }}</span>,
+        a quien en adelante se le denominará <span class="negr">EL TRABAJADOR</span>, en los términos y condiciones
+        siguientes:
+    </p>
+
+    <p><span class="negr">PRIMERO: </span>EL TRABAJADOR presta servicios a EL EMPLEADOR bajo un contrato de trabajo
+        sujeto al Régimen Laboral de la Actividad Privada, regido por el Texto Único Ordenado del Decreto Legislativo
+        N° 728 – Ley de Productividad y Competitividad Laboral (aprobado por D.S. N° 003-97-TR; en adelante, LPCL).
+    </p>
+
+    <p><span class="negr">EL TRABAJADOR</span> declara que, a la fecha de suscripción de este convenio,
+        <span class="negr">EL EMPLEADOR</span> le ha otorgado el descanso vacacional correspondiente a su tiempo de
+        servicios, en forma oportuna y de acuerdo a Ley, no existiendo ningún periodo pendiente de descanso, ni concepto
+        pendiente de pago por este concepto.
+    </p>
+
+    <p>
+        En este contexto, <span class="negr">EL TRABAJADOR</span> ha solicitado verbalmente a
+        <span class="negr">EL EMPLEADOR</span> el otorgamiento anticipado de los días de descanso vacacional
+        que se hubieran generado a cuenta del periodo vacacional futuro
+        {% if periodo_vacacional %}(<span class="negr">{{ periodo_vacacional }}</span>){% endif %}.
+    </p>
+
+    <p>
+        <span class="negr">SEGUNDO:</span> En virtud del presente documento,
+        <span class="negr">EL EMPLEADOR</span> accede a la solicitud de
+        <span class="negr">EL TRABAJADOR</span>, y en consecuencia, ambas partes convienen que
+        <span class="negr">EL TRABAJADOR</span> disfrutará el futuro descanso vacacional remunerado que le
+        correspondiera, por el periodo vacacional a computarse del
+        <span class="negr">{{ periodo_computable }}</span>, de la siguiente forma:
+    </p>
+
+    <!-- Recuadro 80/20 -->
+    <table class="box">
+        <colgroup>
+            <col style="width:80%">
+            <col style="width:20%">
+        </colgroup>
+        <tr>
+            <th>CANTIDAD DE DÍAS DE DESCANSO GENERADOS A LA FECHA</th>
+            <td><span class="negr">{{ dias_generados }}</span> {{ 'día' if dias_generados == 1 else 'días' }}</td>
+        </tr>
+        <tr>
+            <th>CANTIDAD DE DÍAS QUE SE HARÁ USO DEL ADELANTO DE VACACIONES Y QUE DESEA HACER USO DE FIRMA DEL ACUERDO
+            </th>
+            <td><span class="negr">{{ dias_goce }}</span> {{ 'día' if dias_goce == 1 else 'días' }}</td>
+        </tr>
+        <tr>
+            <th>CANTIDAD DE DÍAS DE DESCANSO QUE LE QUEDARÍAN GENERADOS A LA FECHA</th>
+            <td><span class="negr">{{ dias_restantes }}</span> {{ 'día' if dias_restantes == 1 else 'días' }}</td>
+        </tr>
+        <tr>
+            <th>FECHAS EN LAS CUALES SE HARÁ USO DEL ADELANTO DE VACACIONES</th>
+            <td><span class="negr">{{ fechas_uso }}</span></td>
+        </tr>
+    </table>
+
+    <p>
+        <span class="negr">TERCERO:</span> Antes del inicio del descanso vacacional anticipado,
+        <span class="negr">EL EMPLEADOR</span> entregará a <span class="negr">EL TRABAJADOR</span> el importe
+        proporcional de la remuneración vacacional, en calidad de anticipo.
+    </p>
+
+    <p>
+        En este sentido, en el supuesto que la relación laboral de <span class="negr">EL TRABAJADOR</span> culmine sin
+        que éste haya completado el tiempo de servicios necesario para tener derecho a los treinta (30) días de descanso
+        vacacional remunerado, <span class="negr">EL TRABAJADOR</span> acepta que el anticipo otorgado sea compensado
+        con el monto de las vacaciones truncas que le correspondan a la fecha de su cese.
+    </p>
+
+    <p>
+        <span class="negr">CUARTO:</span> En el supuesto negado e improbable que surgiesen controversias relacionadas
+        con el presente convenio, las partes se someten a la jurisdicción de los Juzgados y Salas Especializadas en lo
+        Laboral, del Distrito Judicial del Callao. Todo cambio de domicilio respecto del establecido en la introducción
+        de este contrato debe ser comunicado por escrito a la otra parte. Los cambios de domicilio surtirán efecto en el
+        plazo de cinco (05) días hábiles después de su comunicación a la otra parte.
+    </p>
+
+    <!-- Firmas con TR/TD (solo EMPLEADOR / TRABAJADOR) -->
+    <table style="width:100%; border-collapse:collapse; margin-top:24pt;">
+        <tr>
+            <!-- EMPLEADOR -->
+            <td align="center" style="padding:0 12px; vertical-align:top;">
+                <div style="width:240px; margin:0 auto; text-align:center;">
+                    <!-- Firma centrada -->
+                    <div style="height:110px;">
+                        {% if firma_francisco_url %}
+                        <img src="{{ firma_francisco_url }}" alt="Firma EMPLEADOR"
+                            style="max-height:100px; width:auto; display:block; margin:0 auto;">
+                        {% endif %}
+                    </div>
+                    <!-- Línea bajo la firma -->
+                    <div style="width:240px; border-top:2px solid #222; margin:8px auto 6px;"></div>
+                    <div style="font-weight:700;">EMPLEADOR</div>
+                </div>
+            </td>
+
+            <!-- TRABAJADOR -->
+            <td align="center" style="padding:0 12px; vertical-align:top;">
+                <div style="width:240px; margin:0 auto; text-align:center;">
+                    <div style="height:110px;"></div>
+                    <div style="width:240px; border-top:2px solid #222; margin:8px auto 6px;"></div>
+                    <div style="font-weight:700;">TRABAJADOR</div>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+</body>
+
+</html>

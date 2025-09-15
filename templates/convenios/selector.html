@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Nuevo convenio | {{ empleado.nombre }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h1 class="h4 mb-0">Seleccionar tipo de convenio</h1>
+    <a href="{{ url_for('convenios.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-chevron-left"></i> Volver
+    </a>
+</div>
+
+<!-- Resumen del colaborador -->
+<div class="card mb-4 shadow-sm">
+    <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <div class="fw-semibold">{{ empleado.nombre }}</div>
+                <div class="text-muted small">DNI: {{ empleado.dni }} · Cargo: {{ empleado.cargo or '—' }}</div>
+                <div class="text-muted small">Ingreso: {{ empleado.fecha_ingreso|default('', true) }}</div>
+            </div>
+            <span class="badge bg-primary-subtle text-primary">Colaborador seleccionado</span>
+        </div>
+    </div>
+</div>
+
+<!-- Opciones -->
+<div class="row g-3">
+    <!-- Acumulación -->
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-calendar2-plus fs-4"></i>
+                    <h2 class="h5 mb-0">Acumulación de Vacaciones</h2>
+                </div>
+                <p class="text-muted small mb-4">
+                    Extiende y acumula periodos vacacionales conforme a acuerdo marco y DL 713.
+                </p>
+                <div class="mt-auto">
+                    <a class="btn btn-primary w-100"
+                        href="{{ url_for('convenios.nuevo_acumulacion', empleado_id=empleado.id) }}">
+                        Iniciar acumulación
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Adelanto -->
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-fast-forward fs-4"></i>
+                    <h2 class="h5 mb-0">Adelanto de Vacaciones</h2>
+                </div>
+                <p class="text-muted small mb-4">
+                    Anticipa días futuros bajo condiciones específicas (próx. parametrización).
+                </p>
+                <div class="mt-auto">
+                    <a class="btn btn-outline-primary w-100"
+                        href="{{ url_for('convenios.nuevo_adelanto', empleado_id=empleado.id) }}">
+                        Iniciar adelanto
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

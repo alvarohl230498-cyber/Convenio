@@ -5,45 +5,29 @@
     <meta charset="utf-8">
     <title>GP-R-004 — Solicitud de Préstamo/Descuento</title>
     <style>
+        /* ===== Página (márgenes más pequeños arriba/abajo) ===== */
         @page {
             size: A4;
-            margin: 16mm 16mm 16mm 16mm;
+            margin: 10mm 16mm 10mm 16mm;
         }
 
         :root {
-            /* === Parámetros de ajuste rápido === */
             --cronograma-width: 130mm;
-            /* ancho del cuadro de cronograma */
             --base-font: 10pt;
-            /* fuente general del documento */
             --line-height: 1.28;
-            /* interlineado global ligero */
             --table-font: 9.5pt;
-            /* fuente de la tabla */
             --table-pad-y: 3px;
-            /* padding vertical de celdas */
             --table-pad-x: 6px;
-            /* padding horizontal de celdas */
 
-            /* Motivos: proporciones y espacios */
             --motivos-left: 36%;
-            /* PRÉSTAMOS (más pequeño) */
             --motivos-right: 64%;
-            /* AUTORIZACIÓN (más grande) */
             --motivos-gap: 18px;
-            /* espacio entre columnas */
             --motivos-li-gap: 10px;
-            /* separación entre ítems de las listas */
             --motivos-bottom-gap: 9mm;
-            /* ESPACIO debajo del bloque de motivos */
 
-            /* Ajuste de paréntesis en la COLUMNA DERECHA */
             --right-inner-pad: 32px;
-            /* separa los paréntesis del borde derecho */
             --right-paren-col: 24px;
-            /* ancho fijo de la “columna” de paréntesis */
             --paren-minwidth: 22px;
-            /* ancho mínimo del bloque ( X ) */
         }
 
         * {
@@ -66,7 +50,6 @@
             display: block;
             width: 100%;
             height: auto;
-            image-rendering: auto;
         }
 
         /* Fecha del documento */
@@ -101,15 +84,12 @@
             column-gap: var(--motivos-gap);
             margin-top: 8px;
             margin-bottom: var(--motivos-bottom-gap);
-            /* <<< separa de “La programación…” */
         }
 
         .mot-col.right {
             border-left: 1.5px solid #000;
             padding-left: 22px;
-            /* detrás de la línea vertical */
             padding-right: var(--right-inner-pad);
-            /* trae paréntesis hacia adentro */
         }
 
         .mot-title {
@@ -121,27 +101,22 @@
         ul.bulleted {
             list-style: disc;
             padding-left: 20px;
-            /* sangría del bullet */
             margin: 0;
         }
 
-        /* Texto + paréntesis alineados */
         ul.bulleted li {
             display: grid;
             grid-template-columns: 1fr auto;
             align-items: center;
             margin: var(--motivos-li-gap) 0;
-            /* <<< más separación entre líneas */
         }
 
-        /* En la COLUMNA DERECHA: fija columna de paréntesis */
         .mot-col.right ul.bulleted li {
             grid-template-columns: 1fr var(--right-paren-col);
         }
 
         .parens {
             font-family: "Courier New", monospace;
-            /* ancho fijo para ( X ) */
             font-weight: 700;
             display: inline-block;
             min-width: var(--paren-minwidth);
@@ -156,13 +131,12 @@
             content: ")";
         }
 
-        /* ===== Cronograma (ancho controlado) ===== */
+        /* ===== Cronograma ===== */
         .cronograma {
             width: var(--cronograma-width);
             margin: 0;
         }
 
-        /* para centrar: margin:0 auto */
         .cronograma-title {
             margin: 0 0 6px 0;
         }
@@ -200,13 +174,21 @@
             text-align: right;
         }
 
-        /* ===== Firmas horizontales ===== */
+        /* ===== Política justificada ===== */
+        .policy {
+            text-align: justify;
+        }
+
+        /* ===== Firmas horizontales (más separadas) ===== */
         .firmas-h {
             display: grid;
             grid-template-columns: 46% 2% 52%;
-            row-gap: 12px;
+            /* etiqueta | ':' | línea */
+            row-gap: 22px;
+            /* más espacio vertical entre filas */
             column-gap: 6px;
-            margin-top: 26px;
+            margin-top: 30px;
+            /* separa del bloque anterior */
             font-size: var(--base-font);
         }
 
@@ -223,15 +205,16 @@
             height: 0;
             align-self: center;
             padding-top: 8px;
+            /* baja levemente la línea */
         }
     </style>
 </head>
 
 <body>
 
-    <!-- Encabezado como imagen -->
+    <!-- Encabezado -->
     <div class="header-wrap">
-        <img src="{{ url_for('static', filename='imagenes/Encabezado.png') }}" alt="Encabezado Contrans (GP-R-004)">
+        <img src="{{ url_for('static', filename='imagenes/Encabezado2.png') }}" alt="Encabezado Contrans (GP-R-004)">
     </div>
 
     <p class="fecha-doc">Fecha: {{ hoy.strftime('%d/%m/%Y') }}</p>
@@ -240,12 +223,9 @@
     <div class="section">
         <p>Señores<br><b>CONTRANS SAC</b><br>Presente.-</p>
         <p><b>A quien corresponda:</b></p>
-
         <p>
-            Yo, <b>{{ emp_nombre }}</b> con DNI <b>{{ emp.dni }}</b>, por medio de la presente autorizo a
-            Contrans SAC se me descuente de mis haberes mensuales la siguiente suma de dinero:
-            <b>S/ {{ '%.2f'|format(p.monto_total) }}</b> en <b>{{ '%02d'|format(p.n_cuotas) }}</b> cuota(s),
-            por el siguiente motivo:
+            Yo, <b>{{ emp_nombre }}</b> con DNI <b>{{ emp.dni }}</b>, solicito se me otorgue un
+            préstamo de <b>S/ {{ '%.2f'|format(p.monto_total) }}</b> por el siguiente motivo:
         </p>
     </div>
 
@@ -254,15 +234,16 @@
         <div class="mot-col left">
             <p class="mot-title">PRÉSTAMOS:</p>
             <ul class="bulleted">
-                <li><span>Salud</span> <span class="parens">{{ ('X' if p.tipo=='Salud' else '&nbsp;')|safe }}</span>
+                <li><span>Salud</span><span class="parens">{{ ('X' if p.tipo=='Salud' else '&nbsp;')|safe }}</span></li>
+                <li><span>Escolar</span><span class="parens">{{ ('X' if p.tipo=='Escolar' else '&nbsp;')|safe }}</span>
                 </li>
-                <li><span>Fallecimiento</span> <span class="parens">{{ ('X' if p.tipo=='Fallecimiento' else
+                <li><span>Capacitación</span><span class="parens">{{ ('X' if p.tipo=='Capacitación' else '&nbsp;')|safe
+                        }}</span></li>
+                <li><span>Estudios hijo</span><span class="parens">{{ ('X' if p.tipo=='Estudios hijo' else
                         '&nbsp;')|safe }}</span></li>
-                <li><span>Escolaridad</span> <span class="parens">{{ ('X' if p.tipo=='Escolaridad' else '&nbsp;')|safe
+                <li><span>Catástrofe</span><span class="parens">{{ ('X' if p.tipo=='Catástrofe' else '&nbsp;')|safe
                         }}</span></li>
-                <li><span>Estudios</span> <span class="parens">{{ ('X' if p.tipo=='Estudios' else '&nbsp;')|safe
-                        }}</span></li>
-                <li><span>Extraordinario</span> <span class="parens">{{ ('X' if p.tipo=='Extraordinario' else
+                <li><span>Fallecimiento</span><span class="parens">{{ ('X' if p.tipo=='Fallecimiento' else
                         '&nbsp;')|safe }}</span></li>
             </ul>
         </div>
@@ -270,18 +251,13 @@
         <div class="mot-col right">
             <p class="mot-title">AUTORIZACIÓN DE DESCUENTO:</p>
             <ul class="bulleted">
-                <li><span>Adquisición de Productos</span> <span class="parens">{{ ('X' if p.tipo=='Adquisición de
+                <li><span>Campaña Compra de Productos</span><span class="parens">{{ ('X' if p.tipo=='Campaña Compra de
                         Productos' else '&nbsp;')|safe }}</span></li>
-                <li><span>Pérdida de Equipos y/o implementos</span>
-                    <span class="parens">{{ ('X' if p.tipo=='Pérdida de Equipos y/o implementos' else '&nbsp;')|safe
-                        }}</span>
-                </li>
-                <li><span>Daño a la Infraestructura</span> <span class="parens">{{ ('X' if p.tipo=='Daño a la
-                        Infraestructura' else '&nbsp;')|safe }}</span></li>
-                <li><span>Multa de tránsito</span> <span class="parens">{{ ('X' if p.tipo=='Multa de tránsito' else
-                        '&nbsp;')|safe }}</span></li>
-                <li><span>Otros</span> <span class="parens">{{ ('X' if p.tipo=='Otros' else '&nbsp;')|safe }}</span>
-                </li>
+                <li><span>Pérdida de Equipos y/o implementos</span><span class="parens">{{ ('X' if p.tipo=='Pérdida de
+                        Equipos y/o implementos' else '&nbsp;')|safe }}</span></li>
+                <li><span>Daño a la infraestructura</span><span class="parens">{{ ('X' if p.tipo=='Daño a la
+                        infraestructura' else '&nbsp;')|safe }}</span></li>
+                <li><span>Otros</span><span class="parens">{{ ('X' if p.tipo=='Otros' else '&nbsp;')|safe }}</span></li>
             </ul>
 
             {% if p.motivo_especifico %}
@@ -290,6 +266,13 @@
             <p class="mt-6"><b>Motivo / Observación:</b></p>
             {% endif %}
         </div>
+    </div>
+
+    <div class="section">
+        <p>
+            Me comprometo a devolver dicho monto y autorizo se me descuente de mis haberes mensuales en
+            <b>{{ '%02d'|format(p.n_cuotas) }}</b> cuotas:
+        </p>
     </div>
 
     <!-- Cronograma -->
@@ -319,25 +302,21 @@
         </table>
     </div>
 
-    <!-- Política -->
-    <p class="small mt-12">
+    <!-- Política (justificada) -->
+    <p class="small mt-12 policy">
         <b>Por el presente me comprometo a cumplir la siguiente política de la empresa:</b>
         En el caso que el trabajador deje de laborar en la empresa, la deuda pendiente con CONTRANS será descontada
-        automáticamente de su liquidación de beneficios sociales, liquidaciones de pago de utilidades o de
-        cualquier otro concepto que esté pendiente de pago al suscrito.
+        automáticamente de su liquidación de beneficios sociales, liquidaciones de pago de utilidades o de cualquier
+        otro concepto que esté pendiente de pago al suscrito.
     </p>
 
-    <!-- Firmas horizontales -->
+    <!-- Firmas horizontales (más separadas) -->
     <div class="firmas-h">
         <div class="sig-label">Firma del Trabajador</div>
         <div class="sig-colon">:</div>
         <div class="sig-line"></div>
 
-        <div class="sig-label">Firma del Jefe o Gerente de área</div>
-        <div class="sig-colon">:</div>
-        <div class="sig-line"></div>
-
-        <div class="sig-label">Vº Bº Jefe de Gestión del Talento</div>
+        <div class="sig-label">V°B° Firma del Subgerente de Gestión de Personas</div>
         <div class="sig-colon">:</div>
         <div class="sig-line"></div>
     </div>

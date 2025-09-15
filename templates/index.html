@@ -28,7 +28,7 @@
                         <td>{{ emp.cargo or '-' }}</td>
                         <td>{{ emp.fecha_ingreso.strftime('%d/%m/%Y') if emp.fecha_ingreso else '-' }}</td>
                         <td class="text-center">
-                            <a href="{{ url_for('convenios.view_employee', empleado_id=emp.id) }}"
+                            <a href="{{ url_for('convenios.convenio_selector', empleado_id=emp.id) }}"
                                 class="btn btn-sm btn-info text-white">
                                 <i class="bi bi-eye"></i> Ver
                             </a>

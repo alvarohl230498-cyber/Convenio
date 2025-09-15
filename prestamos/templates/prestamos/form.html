@@ -42,16 +42,16 @@
                     <select class="form-select" name="tipo" id="tipo" required>
                         <optgroup label="Préstamos">
                             <option>Salud</option>
+                            <option>Escolar</option>
+                            <option>Capacitación</option>
+                            <option>Estudios hijo</option>
+                            <option>Catástrofe</option>
                             <option>Fallecimiento</option>
-                            <option>Escolaridad</option>
-                            <option>Estudios</option>
-                            <option>Extraordinario</option>
                         </optgroup>
                         <optgroup label="Autorización de descuento">
-                            <option>Adquisición de productos</option>
-                            <option>Pérdida de equipos/implementos</option>
+                            <option>Campaña Compra de Productos</option>
+                            <option>Pérdida de Equipos y/o implementos</option>
                             <option>Daño a la infraestructura</option>
-                            <option>Multa de tránsito</option>
                             <option>Otros</option>
                         </optgroup>
                     </select>
@@ -185,23 +185,29 @@
                 <div class="row g-2">
                     <div class="col-6">
                         <label class="form-label">DNI</label>
-                        <input id="e_dni" class="form-control" placeholder="DNI">
+                        <input id="e_dni" class="form-control" placeholder="DNI" autocomplete="off">
                     </div>
                     <div class="col-6">
                         <label class="form-label">Nombre completo</label>
-                        <input id="e_nombre" class="form-control" placeholder="Nombre completo">
+                        <!-- Se muestra en mayúsculas y además se fuerza a mayúsculas en el valor -->
+                        <input id="e_nombre" class="form-control" placeholder="Nombre completo"
+                            style="text-transform: uppercase;" autocomplete="off">
                     </div>
                     <div class="col-6">
                         <label class="form-label">Cargo</label>
-                        <input id="e_cargo" class="form-control" placeholder="Cargo">
+                        <input id="e_cargo" class="form-control" placeholder="Cargo" style="text-transform: uppercase;"
+                            autocomplete="off">
                     </div>
                     <div class="col-6">
                         <label class="form-label">Dirección</label>
-                        <input id="e_direccion" class="form-control" placeholder="Dirección">
+                        <input id="e_direccion" class="form-control" placeholder="Dirección"
+                            style="text-transform: uppercase;" autocomplete="off">
                     </div>
                     <div class="col-6">
                         <label class="form-label">Fecha de ingreso</label>
-                        <input id="e_fi" type="date" class="form-control">
+                        <!-- Permite pegar dd/mm/aaaa; se normaliza por JS -->
+                        <input id="e_fi" type="date" class="form-control" autocomplete="off" inputmode="numeric"
+                            placeholder="aaaa-mm-dd">
                     </div>
                 </div>
             </div>
@@ -363,6 +369,74 @@
         dlgCronoModal = new bootstrap.Modal(document.getElementById('dlgCrono'));
         // init modal de Apertura
         dlgAperturaMesModal = new bootstrap.Modal(document.getElementById('dlgAperturaMes'));
+
+        // === Mejoras del modal Crear colaborador ===
+        // 1) Forzar MAYÚSCULAS en nombre/cargo/dirección (input y paste)
+        const toUpperLive = (el) => {
+            if (!el) return;
+            const up = () => { el.value = (el.value || '').toUpperCase(); };
+            el.addEventListener('input', up);
+            el.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const txt = (e.clipboardData || window.clipboardData).getData('text');
+                el.value = (txt || '').toUpperCase();
+            });
+        };
+        toUpperLive(document.getElementById('e_nombre'));
+        toUpperLive(document.getElementById('e_cargo'));
+        toUpperLive(document.getElementById('e_direccion'));
+
+        // 2) Permitir pegar fechas como dd/mm/aaaa, dd-mm-aaaa, etc. en e_fi
+        const efi = document.getElementById('e_fi');
+
+        function parseDateLoose(str) {
+            if (!str) return null;
+            str = String(str).trim();
+
+            // 8 dígitos seguidos: ddmmyyyy
+            if (/^\d{8}$/.test(str)) {
+                const d = str.slice(0, 2), m = str.slice(2, 4), y = str.slice(4, 8);
+                return `${y}-${m}-${d}`;
+            }
+
+            // dd/mm/yyyy o dd-mm-yyyy o dd.mm.yyyy
+            let m1 = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+            if (m1) {
+                let d = m1[1].padStart(2, '0'),
+                    m = m1[2].padStart(2, '0'),
+                    y = m1[3].length === 2 ? ('20' + m1[3]) : m1[3];
+                return `${y}-${m}-${d}`;
+            }
+
+            // yyyy/mm/dd o yyyy-mm-dd o yyyy.mm.dd
+            let m2 = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+            if (m2) {
+                let y = m2[1],
+                    m = m2[2].padStart(2, '0'),
+                    d = m2[3].padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+
+            return null;
+        }
+
+        if (efi) {
+            // Pegar
+            efi.addEventListener('paste', (e) => {
+                const txt = (e.clipboardData || window.clipboardData).getData('text');
+                const iso = parseDateLoose(txt);
+                if (iso) {
+                    e.preventDefault();
+                    efi.value = iso;
+                }
+            });
+            // Al salir del campo, normaliza si puso "14/09/2025" o similar
+            efi.addEventListener('blur', () => {
+                const iso = parseDateLoose(efi.value);
+                if (iso) efi.value = iso;
+            });
+        }
+        // === Fin mejoras modal ===
     });
 
     function toggleGrati() {
@@ -488,13 +562,7 @@
         document.getElementById('cronogramaCard').classList.remove('d-none');
     }
 
-
-
-
-
     // ====== Resto de funciones (sin cambios) ======
-
-
 
     async function buscarEmpleado() { /* igual que ya tienes */
         const dni = document.getElementById('dni').value.trim();
