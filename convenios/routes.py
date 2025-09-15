@@ -856,6 +856,7 @@ def convenio_pdf(convenio_id):
         mimetype="application/pdf",
     )
 
+
 #!###########################DESCARGA CONVENIO##################################
 
 
@@ -917,7 +918,9 @@ def descargar_convenio_pdf(convenio_id):
     total_p1_bloques = sumar_dias(bloques_p1)
 
     remanentes_p1_de_este_convenio = sum(
-        abs(m.dias or 0) for m in conv.movimientos if m.tipo == "CONVENIO" and m.id_periodo == p1_db.id
+        abs(m.dias or 0)
+        for m in conv.movimientos
+        if m.tipo == "CONVENIO" and m.id_periodo == p1_db.id
     )
     if remanentes_p1_de_este_convenio:
         remanentes_p1 = remanentes_p1_de_este_convenio
@@ -946,7 +949,13 @@ def descargar_convenio_pdf(convenio_id):
             "lugar_firma": "Lima",
         },
         empleado=e,
-        p1={"periodo": p1_db.periodo, "inicio": p1_db.fecha_inicio, "fin": p1_db.fecha_fin, "bloques": bloques_p1, "total": total_p1_bloques},
+        p1={
+            "periodo": p1_db.periodo,
+            "inicio": p1_db.fecha_inicio,
+            "fin": p1_db.fecha_fin,
+            "bloques": bloques_p1,
+            "total": total_p1_bloques,
+        },
         p2={
             "periodo": p2_db.periodo,
             "inicio": p2_db.fecha_inicio,
@@ -979,7 +988,6 @@ def descargar_convenio_pdf(convenio_id):
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     return response
-
 
 
 ############################SELECTOR##################################
@@ -1179,6 +1187,10 @@ def adelanto_pdf(empleado_id):
         "rep_dni": "20392952",
         "nombre": emp.nombre,
         "dni": emp.dni,
+        # 👇 AÑADE ESTA LÍNEA (con fallback por si tu modelo usa 'direccion')
+        "domicilio": getattr(emp, "domicilio", None)
+        or getattr(emp, "direccion", "")
+        or "",
         "dias_generados": dias_generados,
         "dias_goce": dias_goce,
         "dias_restantes": dias_restantes,
