@@ -64,12 +64,14 @@
 
                 <div class="col-md-3">
                     <label class="form-label">Fecha de solicitud</label>
-                    <input type="date" class="form-control" name="fecha_solicitud" id="fecha_solicitud" required>
+                    <input type="date" class="form-control" name="fecha_solicitud" id="fecha_solicitud"
+                        value="{{ hoy.strftime('%Y-%m-%d') }}" required>
                 </div>
 
                 <div class="col-md-3">
                     <label class="form-label">Fecha de firma</label>
-                    <input type="date" class="form-control" name="fecha_firma" id="fecha_firma" required>
+                    <input type="date" class="form-control" name="fecha_firma" id="fecha_firma"
+                        value="{{ hoy.strftime('%Y-%m-%d') }}" required>
                 </div>
 
                 <div class="col-md-3">
@@ -162,8 +164,11 @@
                         Descargar Excel
                     </a>
                 </div>
-
             </div>
+
+            <!-- Barra de contexto y subtotales -->
+            <div id="totalesBar" class="alert alert-light border py-2 mb-2 d-none"></div>
+
             <div class="table-responsive">
                 <div id="gridPrestamos"></div>
             </div>
@@ -189,7 +194,6 @@
                     </div>
                     <div class="col-6">
                         <label class="form-label">Nombre completo</label>
-                        <!-- Se muestra en mayúsculas y además se fuerza a mayúsculas en el valor -->
                         <input id="e_nombre" class="form-control" placeholder="Nombre completo"
                             style="text-transform: uppercase;" autocomplete="off">
                     </div>
@@ -205,7 +209,6 @@
                     </div>
                     <div class="col-6">
                         <label class="form-label">Fecha de ingreso</label>
-                        <!-- Permite pegar dd/mm/aaaa; se normaliza por JS -->
                         <input id="e_fi" type="date" class="form-control" autocomplete="off" inputmode="numeric"
                             placeholder="aaaa-mm-dd">
                     </div>
@@ -217,9 +220,7 @@
             </div>
         </div>
     </div>
-
 </div>
-
 
 <!-- Modal: Amortización -->
 <div class="modal fade" id="dlgAmort" tabindex="-1" aria-labelledby="dlgAmortLabel" aria-hidden="true">
@@ -360,23 +361,22 @@
     // ================================================
 
     let dlgEmpModal, dlgAmortModal, dlgCronoModal;
+    let dlgAperturaMesModal;
 
     // Edición previa del cronograma
     let cronogramaEdit = null;   // arreglo con cuotas generadas/ajustadas
     let edicionActiva = false;   // bandera para inputs editables
 
-    // NUEVO: referencia al modal de Apertura
-    let dlgAperturaMesModal;
-
     document.addEventListener('DOMContentLoaded', () => {
         dlgEmpModal = new bootstrap.Modal(document.getElementById('dlgEmp'));
         dlgAmortModal = new bootstrap.Modal(document.getElementById('dlgAmort'));
         dlgCronoModal = new bootstrap.Modal(document.getElementById('dlgCrono'));
-        // init modal de Apertura
         dlgAperturaMesModal = new bootstrap.Modal(document.getElementById('dlgAperturaMes'));
 
+        // Cargar por defecto: últimos 20
+        buscarPrestamos();
+
         // === Mejoras del modal Crear colaborador ===
-        // 1) Forzar MAYÚSCULAS en nombre/cargo/dirección (input y paste)
         const toUpperLive = (el) => {
             if (!el) return;
             const up = () => { el.value = (el.value || '').toUpperCase(); };
@@ -391,20 +391,14 @@
         toUpperLive(document.getElementById('e_cargo'));
         toUpperLive(document.getElementById('e_direccion'));
 
-        // 2) Permitir pegar fechas como dd/mm/aaaa, dd-mm-aaaa, etc. en e_fi
         const efi = document.getElementById('e_fi');
-
         function parseDateLoose(str) {
             if (!str) return null;
             str = String(str).trim();
-
-            // 8 dígitos seguidos: ddmmyyyy
-            if (/^\d{8}$/.test(str)) {
+            if (/^\d{8}$/.test(str)) { // ddmmyyyy
                 const d = str.slice(0, 2), m = str.slice(2, 4), y = str.slice(4, 8);
                 return `${y}-${m}-${d}`;
             }
-
-            // dd/mm/yyyy o dd-mm-yyyy o dd.mm.yyyy
             let m1 = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
             if (m1) {
                 let d = m1[1].padStart(2, '0'),
@@ -412,36 +406,24 @@
                     y = m1[3].length === 2 ? ('20' + m1[3]) : m1[3];
                 return `${y}-${m}-${d}`;
             }
-
-            // yyyy/mm/dd o yyyy-mm-dd o yyyy.mm.dd
             let m2 = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
             if (m2) {
-                let y = m2[1],
-                    m = m2[2].padStart(2, '0'),
-                    d = m2[3].padStart(2, '0');
+                let y = m2[1], m = m2[2].padStart(2, '0'), d = m2[3].padStart(2, '0');
                 return `${y}-${m}-${d}`;
             }
-
             return null;
         }
-
         if (efi) {
-            // Pegar
             efi.addEventListener('paste', (e) => {
                 const txt = (e.clipboardData || window.clipboardData).getData('text');
                 const iso = parseDateLoose(txt);
-                if (iso) {
-                    e.preventDefault();
-                    efi.value = iso;
-                }
+                if (iso) { e.preventDefault(); efi.value = iso; }
             });
-            // Al salir del campo, normaliza si puso "14/09/2025" o similar
             efi.addEventListener('blur', () => {
                 const iso = parseDateLoose(efi.value);
                 if (iso) efi.value = iso;
             });
         }
-        // === Fin mejoras modal ===
     });
 
     function toggleGrati() {
@@ -468,43 +450,38 @@
     }
     function toNumber(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 
-    // --- ÚNICA versión de editCampo (NO re-renderiza al escribir monto)
+    // --- Edición cronograma
     function editCampo(i, campo, valor) {
         if (!cronogramaEdit) return;
-
         if (campo === 'monto') {
             cronogramaEdit[i].monto = toNumber(normMoney(valor));
-            updatePrevTotal();              // solo actualiza TOTAL
+            updatePrevTotal();
             return;
         }
         if (campo === 'es_grati') { cronogramaEdit[i].es_grati = !!valor; return; }
         if (campo === 'anio' || campo === 'mes' || campo === 'orden') {
-            cronogramaEdit[i][campo] = parseInt(valor || 0) || 0;
-            return;
+            cronogramaEdit[i][campo] = parseInt(valor || 0) || 0; return;
         }
-        cronogramaEdit[i][campo] = valor; // etiqueta, etc.
+        cronogramaEdit[i][campo] = valor;
     }
-
     function updatePrevTotal() {
         const total = (cronogramaEdit || []).reduce((s, x) => s + Number(x.monto || 0), 0);
         const t = document.getElementById('cronoPrevTotal');
         if (t) t.textContent = money(total);
     }
-
     function toggleEdicion() {
         edicionActiva = !edicionActiva;
-        renderCronograma();  // aquí sí re-render completo
+        renderCronograma();
     }
-
     function renderCronograma() {
         if (!cronogramaEdit) return;
         const rows = [];
         rows.push(`
         <div class="d-flex gap-2 mb-2">
-        <button type="button" class="btn btn-outline-info btn-sm" onclick="toggleEdicion()">
+          <button type="button" class="btn btn-outline-info btn-sm" onclick="toggleEdicion()">
             ${edicionActiva ? 'Bloquear edición' : 'Editar cronograma'}
-        </button>
-        <small class="text-muted">Ajusta etiquetas, mes/año y montos. El total se actualiza en vivo.</small>
+          </button>
+          <small class="text-muted">Ajusta etiquetas, mes/año y montos. El total se actualiza en vivo.</small>
         </div>
         <table class="table table-sm table-striped align-middle mb-0">
         <thead class="table-light">
@@ -518,41 +495,34 @@
             </tr>
         </thead>
         <tbody>`);
-
         cronogramaEdit.forEach((it, i) => {
             rows.push(`<tr>
         <td>${it.orden}</td>
         <td>${edicionActiva
                     ? `<input class="form-control form-control-sm" value="${val(it.etiqueta)}"
                         oninput="editCampo(${i}, 'etiqueta', this.value)">`
-                    : val(it.etiqueta)
-                }</td>
+                    : val(it.etiqueta)}</td>
         <td>${edicionActiva
                     ? `<input type="number" min="1" max="12" class="form-control form-control-sm"
                         value="${it.mes}" oninput="editCampo(${i}, 'mes', this.value)">`
-                    : it.mes
-                }</td>
+                    : it.mes}</td>
         <td>${edicionActiva
                     ? `<input type="number" min="2020" max="2100" class="form-control form-control-sm"
                         value="${it.anio}" oninput="editCampo(${i}, 'anio', this.value)">`
-                    : it.anio
-                }</td>
+                    : it.anio}</td>
         <td class="text-end">${edicionActiva
                     ? `<input type="text" inputmode="decimal"
                         class="form-control form-control-sm text-end"
                         value="${dinero(it.monto)}"
                         oninput="editCampo(${i}, 'monto', this.value)"
                         onblur="this.value = dinero(normMoney(this.value)); editCampo(${i}, 'monto', this.value)">`
-                    : dinero(it.monto)
-                }</td>
+                    : dinero(it.monto)}</td>
         <td>${edicionActiva
                     ? `<input class="form-check-input" type="checkbox" ${it.es_grati ? 'checked' : ''}
                         onchange="editCampo(${i}, 'es_grati', this.checked)">`
-                    : (it.es_grati ? '<span class="badge text-bg-info">Gratificación</span>' : '')
-                }</td>
+                    : (it.es_grati ? '<span class="badge text-bg-info">Gratificación</span>' : '')}</td>
         </tr>`);
         });
-
         const total = cronogramaEdit.reduce((s, x) => s + Number(x.monto || 0), 0);
         rows.push(`
         <tr class="fw-semibold">
@@ -561,15 +531,14 @@
             <td class="text-end" id="cronoPrevTotal">${dinero(total)}</td>
             <td></td>
         </tr>
-    </tbody></table>`);
-
+        </tbody></table>`);
         document.getElementById('cronograma').innerHTML = rows.join('');
         document.getElementById('cronogramaCard').classList.remove('d-none');
     }
 
-    // ====== Resto de funciones (sin cambios salvo formato visual de montos) ======
+    // ====== Resto de funciones ======
 
-    async function buscarEmpleado() { /* igual que ya tienes */
+    async function buscarEmpleado() {
         const dni = document.getElementById('dni').value.trim();
         const empDiv = document.getElementById('empInfo');
         if (!dni) { alert('Ingrese DNI'); return; }
@@ -634,7 +603,7 @@
             orden: x.orden, etiqueta: x.etiqueta, anio: x.anio, mes: x.mes,
             es_grati: !!x.es_grati, monto: Number(x.monto)
         }));
-        edicionActiva = true;  // entra directo en modo edición si quieres
+        edicionActiva = true;
         renderCronograma();
     }
 
@@ -660,10 +629,52 @@
         window.location.href = js.pdf_url;
     }
 
+    // === Listado: últimos 20 por defecto / filtro por DNI ===
     async function buscarPrestamos() {
         const dni = document.getElementById('qdni').value.trim();
-        const r = await fetch(`/api/prestamos?dni=${encodeURIComponent(dni)}`);
-        const js = await r.json();
+
+        // Construye URL: si hay DNI, filtra; si no, limitar a 20
+        let url = '/api/prestamos';
+        if (dni) {
+            url += `?dni=${encodeURIComponent(dni)}`;
+        } else {
+            url += `?limit=20`;
+        }
+        const r = await fetch(url);
+        let js = [];
+        try { js = await r.json(); } catch { js = []; }
+
+
+
+        // Subtotales
+        const subtotalMonto = js.reduce((s, p) => s + Number(p.monto_total || 0), 0);
+        const subtotalSaldo = js.reduce((s, p) => s + Number(p.saldo_pendiente || 0), 0);
+
+        // Barra de contexto
+        const bar = document.getElementById('totalesBar');
+        if (dni) {
+            bar.classList.remove('d-none');
+            bar.innerHTML = `
+              <div class="d-flex flex-wrap justify-content-between align-items-center">
+                <div><strong>Resultados para DNI ${dni}</strong> — ${js.length} registro(s)</div>
+                <div><strong>Subtotales mostrados</strong>:
+                  Monto S/ ${money(subtotalMonto)} |
+                  Saldo S/ ${money(subtotalSaldo)}
+                </div>
+              </div>`;
+        } else {
+            bar.classList.remove('d-none');
+            bar.innerHTML = `
+              <div class="d-flex flex-wrap justify-content-between align-items-center">
+                <div><strong>Mostrando últimos 20</strong> (global)</div>
+                <div><strong>Subtotales mostrados</strong>:
+                  Monto S/ ${money(subtotalMonto)} |
+                  Saldo S/ ${money(subtotalSaldo)}
+                </div>
+              </div>`;
+        }
+
+        // Render tabla
         const rows = [];
         rows.push(`<table class="table table-sm table-striped align-middle mb-0">
         <thead class="table-dark">
@@ -684,33 +695,32 @@
         </td>
         </tr>`);
         });
+        // Fila de subtotales de lo renderizado
+        rows.push(`
+          <tr class="fw-semibold">
+            <td colspan="4" class="text-end">SUBTOTAL (mostrado)</td>
+            <td class="text-end">S/ ${money(subtotalMonto)}</td>
+            <td class="text-end">S/ ${money(subtotalSaldo)}</td>
+            <td colspan="2"></td>
+          </tr>
+        `);
         rows.push(`</tbody></table>`);
         document.getElementById('gridPrestamos').innerHTML = rows.join('');
     }
 
     async function openAmort(id) {
-        // setea ID y fecha hoy
         document.getElementById('amort_id').value = id;
         document.getElementById('amort_fecha').valueAsDate = new Date();
-
-        // limpia monto/obs
         const inputMonto = document.getElementById('amort_monto');
         inputMonto.value = '';
         document.getElementById('amort_obs').value = '';
-
-        // muestra modal de inmediato (mejor UX)
         dlgAmortModal.show();
-
         try {
             const r = await fetch(`/api/prestamos/${id}/saldo`);
             const js = await r.json();
             if (!r.ok) throw new Error(js.error || 'No se pudo obtener el saldo');
-
             const saldo = Number(js.saldo ?? 0);
-            // Prefija el monto con el saldo (input numérico: dejamos .toFixed)
             inputMonto.value = saldo.toFixed(2);
-
-            // Opcional: evita exceder saldo
             if (saldo > 0) {
                 inputMonto.setAttribute('max', saldo.toFixed(2));
                 inputMonto.setAttribute('min', '0.01');
@@ -739,7 +749,6 @@
         const js = await r.json();
         if (!r.ok) { alert(js.error || 'Error'); return; }
         dlgAmortModal.hide();
-        // refresca tu listado como ya haces
         buscarPrestamos && buscarPrestamos();
     }
 
@@ -777,8 +786,8 @@
             alert('Error de red al consultar el cronograma.');
         }
     }
-    // ====== CIERRE DE PERIDIO ======
 
+    // ====== CIERRE DE PERIODO ======
     async function cerrarAbiertos() {
         const dni = (document.getElementById('qdni').value || '').trim();
         const hoy = new Date();
@@ -818,8 +827,7 @@
         }
     }
 
-
-    // ====== NUEVO: Apertura (reabrir) ======
+    // ====== APERTURA (reabrir) ======
     function abrirAperturaMes() {
         const hoy = new Date();
         document.getElementById('ap_mes').value = (hoy.getMonth() + 1);
@@ -864,32 +872,25 @@
         }
     }
 
-    // ====== NUEVO: Eliminar (borrado duro) ======
+    // ====== Eliminar (borrado duro) ======
     async function deletePrestamo(id, btn) {
         if (!confirm(`¿Eliminar el préstamo #${id}? Esta acción no se puede deshacer.`)) return;
-
         const origHtml = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = 'Eliminando…';
-
         try {
             let resp = await fetch(`/api/prestamos/${id}`, { method: 'DELETE' });
-
-            // Fallback si el servidor bloquea DELETE
             if (resp.status === 405 || resp.status === 404) {
                 resp = await fetch(`/api/prestamos/${id}`, { method: 'POST' });
             }
-
             let js = {};
             try { js = await resp.json(); } catch { }
-
             if (!resp.ok || js.error) {
                 alert(js.error || `No se pudo eliminar el préstamo #${id}.`);
                 btn.disabled = false;
                 btn.innerHTML = origHtml;
                 return;
             }
-
             await buscarPrestamos();
         } catch (e) {
             console.error(e);

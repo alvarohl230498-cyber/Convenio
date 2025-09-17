@@ -22,19 +22,82 @@ from .services import (
 from weasyprint import HTML, CSS
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func
+from flask_login import login_required
 
 from . import prestamos_bp
 from .models import Prestamo, Cuota, Documento
 from .services import generar_cronograma, nombre_mes, PDF_CSS, amortizar, dec
 from models import db, Empleado
 
+#!#######################################ARREGLO DE VISUALIZACION DATA EN FORMHTML##################################################
+
+
+@prestamos_bp.get("/prestamos")
+@login_required
+def prestamos_index():
+    dni = (request.args.get("dni") or "").strip()
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 20, type=int)
+
+    prestamos = []
+    pagination = None
+    page_totals = {"monto": 0.0, "saldo": 0.0}
+    totals_dni = None
+
+    if len(dni) == 8 and dni.isdigit():
+        q = Prestamo.query.filter(
+            Prestamo.dni == dni, Prestamo.estado != "Cancelado"
+        ).order_by(Prestamo.id.asc())
+        pagination = q.paginate(page=page, per_page=per_page, error_out=False)
+        prestamos = pagination.items
+
+        total_monto, total_saldo = (
+            db.session.query(
+                func.coalesce(func.sum(Prestamo.monto), 0.0),
+                func.coalesce(func.sum(Prestamo.saldo), 0.0),
+            )
+            .filter(Prestamo.dni == dni)
+            .one()
+        )
+        totals_dni = {
+            "monto": float(total_monto or 0),
+            "saldo": float(total_saldo or 0),
+        }
+    else:
+        sub = (
+            db.session.query(Prestamo.id)
+            .filter(Prestamo.estado != "Cancelado")  # ⬅️ aquí
+            .order_by(Prestamo.id.desc())
+            .limit(20)
+            .subquery()
+        )
+        prestamos = (
+            db.session.query(Prestamo)
+            .join(sub, Prestamo.id == sub.c.id)
+            .order_by(Prestamo.id.asc())
+            .all()
+        )
+
+    page_totals["monto"] = sum(float(p.monto or 0) for p in prestamos)
+    page_totals["saldo"] = sum(float(p.saldo or 0) for p in prestamos)
+
+    return render_template(
+        "prestamos/index.html",
+        prestamos=prestamos,
+        pagination=pagination,
+        dni=dni,
+        per_page=per_page,
+        page_totals=page_totals,
+        totals_dni=totals_dni,
+    )
+
 
 @prestamos_bp.route("/prestamos/nuevo")
 def ui_nuevo_prestamo():
     dni = request.args.get("dni", "").strip()
     empleado = Empleado.query.filter_by(dni=dni).first() if dni else None
-    return render_template("prestamos/form.html", empleado=empleado)
+    return render_template("prestamos/form.html", empleado=empleado, hoy=date.today())
 
 
 @prestamos_bp.route("/api/prestamos/cronograma/preview", methods=["POST"])
@@ -481,20 +544,38 @@ def export_excel():
 
 @prestamos_bp.route("/api/prestamos")
 def api_listar_prestamos():
-    dni = request.args.get("dni")
-    q = db.session.query(Prestamo, Empleado).join(
+    dni = (request.args.get("dni") or "").strip()
+    limit = request.args.get("limit", type=int)
+
+    base = db.session.query(Prestamo, Empleado).join(
         Empleado, Prestamo.empleado_id == Empleado.id
     )
+
     if dni:
-        q = q.filter(Empleado.dni == dni)
+        q = base.filter(Empleado.dni == dni, Prestamo.estado != "Cancelado").order_by(Prestamo.id.asc())
+    else:
+        n = limit or 20
+        sub = (
+            db.session.query(Prestamo.id)
+            .filter(Prestamo.estado != "Cancelado")
+            .order_by(Prestamo.id.desc())
+            .limit(n)
+            .subquery()
+        )
+        q = base.join(sub, Prestamo.id == sub.c.id).order_by(Prestamo.id.asc())
+
+    rows = q.all()
+
     data = []
-    for p, e in q.order_by(Prestamo.creado_en.asc()).all():
-        saldo = float(sum(c.monto for c in p.cuotas if c.estado == "Pendiente"))
+    for p, e in rows:
+        saldo = float(
+            sum(c.monto for c in p.cuotas if (c.estado or "Pendiente") == "Pendiente")
+        )
         data.append(
             {
                 "id": p.id,
                 "dni": e.dni,
-                "nombre": nombre_empleado(e),  # ← nombre consistente
+                "nombre": nombre_empleado(e),
                 "tipo": p.tipo,
                 "monto_total": float(p.monto_total),
                 "saldo_pendiente": round(saldo, 2),
