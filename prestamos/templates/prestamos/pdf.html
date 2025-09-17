@@ -5,7 +5,6 @@
     <meta charset="utf-8">
     <title>GP-R-004 — Solicitud de Préstamo/Descuento</title>
     <style>
-        /* ===== Página (márgenes más pequeños arriba/abajo) ===== */
         @page {
             size: A4;
             margin: 10mm 16mm 10mm 16mm;
@@ -18,13 +17,11 @@
             --table-font: 9.5pt;
             --table-pad-y: 3px;
             --table-pad-x: 6px;
-
             --motivos-left: 36%;
             --motivos-right: 64%;
             --motivos-gap: 18px;
             --motivos-li-gap: 10px;
             --motivos-bottom-gap: 9mm;
-
             --right-inner-pad: 32px;
             --right-paren-col: 24px;
             --paren-minwidth: 22px;
@@ -41,7 +38,6 @@
             color: #111;
         }
 
-        /* ===== Encabezado como imagen ===== */
         .header-wrap {
             margin-bottom: 7mm;
         }
@@ -52,7 +48,6 @@
             height: auto;
         }
 
-        /* Fecha del documento */
         .fecha-doc {
             text-align: right;
             font-size: calc(var(--base-font) + 1pt);
@@ -60,7 +55,6 @@
             margin-bottom: 5mm;
         }
 
-        /* Utilidades */
         .section {
             margin-top: 8px;
         }
@@ -77,7 +71,6 @@
             margin-top: 12px;
         }
 
-        /* ===== MOTIVOS ===== */
         .motivos {
             display: grid;
             grid-template-columns: var(--motivos-left) var(--motivos-right);
@@ -131,7 +124,6 @@
             content: ")";
         }
 
-        /* ===== Cronograma ===== */
         .cronograma {
             width: var(--cronograma-width);
             margin: 0;
@@ -174,21 +166,16 @@
             text-align: right;
         }
 
-        /* ===== Política justificada ===== */
         .policy {
             text-align: justify;
         }
 
-        /* ===== Firmas horizontales (más separadas) ===== */
         .firmas-h {
             display: grid;
             grid-template-columns: 46% 2% 52%;
-            /* etiqueta | ':' | línea */
             row-gap: 22px;
-            /* más espacio vertical entre filas */
             column-gap: 6px;
             margin-top: 30px;
-            /* separa del bloque anterior */
             font-size: var(--base-font);
         }
 
@@ -205,31 +192,20 @@
             height: 0;
             align-self: center;
             padding-top: 8px;
-            /* baja levemente la línea */
         }
     </style>
 </head>
 
 <body>
-
-    <!-- Encabezado -->
     <div class="header-wrap">
         <img src="{{ url_for('static', filename='imagenes/Encabezado2.png') }}" alt="Encabezado Contrans (GP-R-004)">
     </div>
-
     <p class="fecha-doc">Fecha: {{ hoy.strftime('%d/%m/%Y') }}</p>
-
-    <!-- Cuerpo -->
     <div class="section">
         <p>Señores<br><b>CONTRANS SAC</b><br>Presente.-</p>
         <p><b>A quien corresponda:</b></p>
-        <p>
-            Yo, <b>{{ emp_nombre }}</b> con DNI <b>{{ emp.dni }}</b>, solicito se me otorgue un
-            préstamo de <b>S/ {{ '%.2f'|format(p.monto_total) }}</b> por el siguiente motivo:
-        </p>
+        <p>Yo, <b>{{ emp_nombre }}</b> con DNI <b>{{ emp.dni }}</b>, solicito se me otorgue un préstamo de <b>S/ {{"{:,.2f}".format(p.monto_total) }}</b> por el siguiente motivo:</p>
     </div>
-
-    <!-- Motivos -->
     <div class="section motivos">
         <div class="mot-col left">
             <p class="mot-title">PRÉSTAMOS:</p>
@@ -247,19 +223,14 @@
                         '&nbsp;')|safe }}</span></li>
             </ul>
         </div>
-
         <div class="mot-col right">
             <p class="mot-title">AUTORIZACIÓN DE DESCUENTO:</p>
             <ul class="bulleted">
-                <li><span>Campaña Compra de Productos</span><span class="parens">{{ ('X' if p.tipo=='Campaña Compra de
-                        Productos' else '&nbsp;')|safe }}</span></li>
-                <li><span>Pérdida de Equipos y/o implementos</span><span class="parens">{{ ('X' if p.tipo=='Pérdida de
-                        Equipos y/o implementos' else '&nbsp;')|safe }}</span></li>
-                <li><span>Daño a la infraestructura</span><span class="parens">{{ ('X' if p.tipo=='Daño a la
-                        infraestructura' else '&nbsp;')|safe }}</span></li>
+                <li><span>Campaña Compra de Productos</span><span class="parens">{{ ('X' if p.tipo=='Campaña Compra de Productos' else '&nbsp;')|safe }}</span></li>
+                <li><span>Pérdida de Equipos y/o implementos</span><span class="parens">{{ ('X' if p.tipo=='Pérdida de Equipos y/o implementos' else '&nbsp;')|safe }}</span></li>
+                <li><span>Daño a la infraestructura</span><span class="parens">{{ ('X' if p.tipo=='Daño a la infraestructura' else '&nbsp;')|safe }}</span></li>
                 <li><span>Otros</span><span class="parens">{{ ('X' if p.tipo=='Otros' else '&nbsp;')|safe }}</span></li>
             </ul>
-
             {% if p.motivo_especifico %}
             <p class="mt-6"><b>Motivo / Observación:</b> {{ p.motivo_especifico }}</p>
             {% else %}
@@ -267,60 +238,40 @@
             {% endif %}
         </div>
     </div>
-
     <div class="section">
-        <p>
-            Me comprometo a devolver dicho monto y autorizo se me descuente de mis haberes mensuales en
-            <b>{{ '%02d'|format(p.n_cuotas) }}</b> cuotas:
-        </p>
+        <p>Me comprometo a devolver dicho monto y autorizo se me descuente de mis haberes mensuales en <b>{{
+                '%02d'|format(p.n_cuotas) }}</b> cuotas:</p>
     </div>
-
-    <!-- Cronograma -->
     <div class="section cronograma">
         <p class="cronograma-title"><b>La programación de los descuentos es como sigue:</b></p>
         <table class="table">
             <thead>
-                <tr>
-                    <th>N°</th>
-                    <th>Fecha de descuento (Mes y Año)</th>
-                    <th>Importe S/.</th>
-                </tr>
+                <tr><th>N°</th><th>Fecha de descuento (Mes y Año)</th><th>Importe S/.</th></tr>
             </thead>
             <tbody>
                 {% for c in cuotas %}
                 <tr>
                     <td>{{ c.orden }}</td>
                     <td>{{ c.etiqueta }}</td>
-                    <td>S/ {{ '%.2f'|format(c.monto) }}</td>
+                    <td>S/ {{ "{:,.2f}".format(c.monto) }}</td>
                 </tr>
                 {% endfor %}
                 <tr>
                     <th colspan="2" style="text-align:right;">TOTAL</th>
-                    <th>S/ {{ '%.2f'|format(p.monto_total) }}</th>
+                    <th>S/ {{ "{:,.2f}".format(p.monto_total) }}</th>
                 </tr>
             </tbody>
         </table>
     </div>
 
-    <!-- Política (justificada) -->
-    <p class="small mt-12 policy">
-        <b>Por el presente me comprometo a cumplir la siguiente política de la empresa:</b>
+    <p class="small mt-12 policy"><b>Por el presente me comprometo a cumplir la siguiente política de la empresa:</b>
         En el caso que el trabajador deje de laborar en la empresa, la deuda pendiente con CONTRANS será descontada
         automáticamente de su liquidación de beneficios sociales, liquidaciones de pago de utilidades o de cualquier
-        otro concepto que esté pendiente de pago al suscrito.
-    </p>
+        otro concepto que esté pendiente de pago al suscrito.</p>
 
-    <!-- Firmas horizontales (más separadas) -->
     <div class="firmas-h">
-        <div class="sig-label">Firma del Trabajador</div>
-        <div class="sig-colon">:</div>
-        <div class="sig-line"></div>
-
-        <div class="sig-label">V°B° Firma del Subgerente de Gestión de Personas</div>
-        <div class="sig-colon">:</div>
-        <div class="sig-line"></div>
+        <div class="sig-label">Firma del Trabajador</div><div class="sig-colon">:</div><div class="sig-line"></div>
+        <div class="sig-label">V°B° Firma del Subgerente de Gestión de Personas</div><div class="sig-colon">:</div><div class="sig-line"></div>
     </div>
-
 </body>
-
 </html>

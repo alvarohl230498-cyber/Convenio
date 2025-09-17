@@ -129,7 +129,7 @@ def api_crear_prestamo():
     db.session.add(p)
     db.session.flush()
 
-    # ⬇️ NUEVO: usa cuotas_custom si vienen; si no, genera
+    # Cuotas
     raw_custom = d.get("cuotas_custom")
     if raw_custom:
         try:
@@ -148,7 +148,6 @@ def api_crear_prestamo():
             anio_grati_desde,
         )
 
-    # Guarda cuotas
     for it in items:
         try:
             fct = (
@@ -172,19 +171,49 @@ def api_crear_prestamo():
         )
 
     db.session.commit()
+
+    # 🔹 Construcción del nombre de archivo
+    fecha_str = p.fecha_firma.strftime("%Y-%m-%d")
+    tipo_str = (p.tipo or "OTROS").upper().replace(" ", "_")
+    nombre_str = (nombre_empleado(emp) or "").upper().replace(" ", "_")
+    filename = f"{fecha_str}_DESCUENTO_{tipo_str}_{nombre_str}.pdf"
+
     return jsonify(
-        {"id": p.id, "pdf_url": url_for("prestamos.pdf_prestamo", prestamo_id=p.id)}
+        {
+            "id": p.id,
+            "pdf_url": url_for(
+                "prestamos.pdf_prestamo", prestamo_id=p.id, _external=True
+            ),
+            "filename": filename,
+        }
     )
 
 
 @prestamos_bp.route("/prestamos/<int:prestamo_id>/pdf")
 def pdf_prestamo(prestamo_id: int):
+    import os, unicodedata
+
     p = Prestamo.query.get_or_404(prestamo_id)
-    emp_nombre = nombre_empleado(p.empleado)
+
+    # ---- Helper para limpiar y poner en MAYÚSCULAS con '_' ----
+    def _slug_upper(s: str) -> str:
+        if not s:
+            return ""
+        s = unicodedata.normalize("NFKD", s)
+        s = "".join(ch for ch in s if not unicodedata.combining(ch))  # quita tildes
+        s = s.upper().replace(" ", "_")
+        s = "".join(
+            ch for ch in s if ch.isalnum() or ch in ("_", "-")
+        )  # seguro p/archivo
+        return s
+
+    emp = p.empleado
+    emp_nombre = nombre_empleado(emp)
+
     html = render_template(
         "prestamos/pdf.html",
         p=p,
-        emp=p.empleado,
+        emp=emp,
         emp_nombre=emp_nombre,
         cuotas=p.cuotas,
         nombre_mes=nombre_mes,
@@ -194,15 +223,28 @@ def pdf_prestamo(prestamo_id: int):
         stylesheets=[CSS(string=PDF_CSS)]
     )
 
+    # ---- Construcción del nombre final ----
+    fecha_str = (
+        p.fecha_firma.strftime("%Y-%m-%d")
+        if p.fecha_firma
+        else date.today().strftime("%Y-%m-%d")
+    )
+    tipo_str = _slug_upper(p.tipo or "OTROS")
+    nombre_str = _slug_upper(emp_nombre or "")
+    filename = f"{fecha_str}_DESCUENTO_{tipo_str}_{nombre_str}.pdf"
+
+    # ---- Guardar en disco con ese nombre ----
     ruta = os.path.join("storage", "prestamos")
     os.makedirs(ruta, exist_ok=True)
-    filename = f"prestamo_{p.id}.pdf"
     fullpath = os.path.join(ruta, filename)
     with open(fullpath, "wb") as f:
         f.write(pdf)
 
+    # ---- Persistir registro del documento ----
     db.session.add(Documento(prestamo_id=p.id, ruta_pdf=fullpath))
     db.session.commit()
+
+    # ---- Enviar con nombre de descarga correcto ----
     return send_file(fullpath, as_attachment=True, download_name=filename)
 
 
@@ -211,8 +253,9 @@ def export_excel():
     import os
     import pandas as pd
     from pandas import ExcelWriter
-    from datetime import date as _date  # por si no estaba importado
+    from datetime import date as _date
     from flask import send_file
+    from openpyxl.utils import column_index_from_string, get_column_letter
 
     # ------------------ Datos base ------------------
     Qp = (
@@ -222,7 +265,7 @@ def export_excel():
     )
     rows_p = [
         {
-            "ID_PRESTAMO": p.id,  # <<<<<< clave para enlazar con cuotas
+            "ID_PRESTAMO": p.id,
             "DNI": e.dni,
             "NOMBRE": nombre_empleado(e),
             "PRESTAMO": (
@@ -258,7 +301,9 @@ def export_excel():
         {
             "ID_PRESTAMO": p.id,
             "DNI": e.dni,
-            "FECHA_COBRO": _date(c.anio, c.mes, 1).strftime("%Y-%m-%d"),
+            "FECHA_COBRO": (
+                _date(c.anio, c.mes, 1).strftime("%Y-%m-%d") if c.anio and c.mes else ""
+            ),
             "ETIQUETA": c.etiqueta,
             "MONTO": float(c.monto),
             "ESTADO": (c.estado or "Pendiente").strip(),
@@ -270,16 +315,12 @@ def export_excel():
     df_c = pd.DataFrame(rows_c)
 
     # ------------------ Cronograma en columnas (MISMA hoja) ------------------
-    # Solo si hay cuotas
+    month_cols = []
     if not df_c.empty:
-        # 1) Normaliza estado y quita de columnas SOLO las 'Amortizada'
         df_c["ESTADO"] = df_c["ESTADO"].fillna("Pendiente").astype(str)
         mask_amort = df_c["ESTADO"].str.strip().str.lower().eq("amortizada")
-        # Las amortizadas NO deben aparecer en columnas (no pasarán por planilla)
         df_c.loc[mask_amort, "MONTO"] = 0.0
-        # Las 'Descontada' se mantienen con su monto (histórico de planilla)
 
-        # 2) Mapas de columnas
         MES_ABBR = {
             1: "ene",
             2: "feb",
@@ -295,14 +336,12 @@ def export_excel():
             12: "dic",
         }
 
-        # Normalizamos fecha y gratuidades
         df_c["FECHA_COBRO"] = pd.to_datetime(df_c["FECHA_COBRO"], errors="coerce")
         df_c["is_grati"] = df_c["ETIQUETA"].str.contains("grat", case=False, na=False)
 
-        # Etiquetas de columnas (mes y gratificación con mes)
         df_c["col"] = df_c["FECHA_COBRO"].apply(
             lambda d: (
-                f"{MES_ABBR.get(d.month, '')} {str(d.year)[-2:]}"
+                f"{MES_ABBR.get(d.month,'')} {str(d.year)[-2:]}"
                 if pd.notnull(d)
                 else None
             )
@@ -311,13 +350,12 @@ def export_excel():
             df_c["is_grati"], "FECHA_COBRO"
         ].apply(
             lambda d: (
-                f"grati {MES_ABBR.get(d.month, '')} {str(d.year)[-2:]}"
+                f"grati {MES_ABBR.get(d.month,'')} {str(d.year)[-2:]}"
                 if pd.notnull(d)
                 else None
             )
         )
 
-        # Orden: desde HOY hacia futuro (grati medio paso antes del mes)
         today = pd.Timestamp.today().normalize()
 
         def sort_key(r):
@@ -334,7 +372,6 @@ def export_excel():
             .sort_values("sort_key")
         )["col"].tolist()
 
-        # Pivot por PRESTAMO (no por DNI), para pegar a la fila correcta
         pivot_mes = (
             pd.pivot_table(
                 df_c,
@@ -343,50 +380,101 @@ def export_excel():
                 values="MONTO",
                 aggfunc="sum",
             )
-            .reindex(columns=col_order)  # orden ya calculado
+            .reindex(columns=col_order)
             .fillna(0.0)
             .reset_index()
         )
 
-        # Merge con df_p por ID_PRESTAMO
         df_p = df_p.merge(pivot_mes, on="ID_PRESTAMO", how="left")
         month_cols = [c for c in col_order if c in df_p.columns]
         if month_cols:
             df_p[month_cols] = df_p[month_cols].fillna(0.0)
-
-            # Insertar columnas de meses justo DESPUÉS de 'AÑO'
             base_cols = list(df_p.columns)
-            # (preservamos todas las columnas actuales excepto las de meses, que se reubicarán)
-            base_cols_wo_months = [c for c in base_cols if c not in month_cols]
-            pos = base_cols_wo_months.index("AÑO") + 1
-            new_order = (
-                base_cols_wo_months[:pos] + month_cols + base_cols_wo_months[pos:]
-            )
+            base_cols_wo = [c for c in base_cols if c not in month_cols]
+            pos = base_cols_wo.index("AÑO") + 1
+            new_order = base_cols_wo[:pos] + month_cols + base_cols_wo[pos:]
             df_p = df_p[new_order]
 
-        # Si no quieres mostrar ID_PRESTAMO en la hoja final, elimínalo:
-        # df_p = df_p.drop(columns=["ID_PRESTAMO"])
-
-    # ------------------ Otros reportes (sin cambios) ------------------
+    # ------------------ Pivot extra (opcional) ------------------
     pivot = (
-        (
-            pd.pivot_table(
-                df_c, index=["DNI"], columns=["ETIQUETA"], values="MONTO", aggfunc="sum"
-            )
-            .fillna(0)
-            .reset_index()
+        pd.pivot_table(
+            df_c, index=["DNI"], columns=["ETIQUETA"], values="MONTO", aggfunc="sum"
         )
+        .fillna(0)
+        .reset_index()
         if not df_c.empty
         else pd.DataFrame()
     )
 
+    # ------------------ Escribir Excel + FORMATO numérico ------------------
     os.makedirs("storage/exports", exist_ok=True)
     out_path = os.path.join("storage/exports", "Prestamos.xlsx")
     with ExcelWriter(out_path, engine="openpyxl") as w:
-        df_p.to_excel(w, index=False, sheet_name="Prestamos")  # ← misma hoja con meses
-        # df_c.to_excel(w, index=False, sheet_name="Cuotas")
+        df_p.to_excel(w, index=False, sheet_name="Prestamos")
         if not pivot.empty:
             pivot.to_excel(w, index=False, sheet_name="Reporte_Pivot")
+
+        # ===== Formato en hoja Prestamos =====
+        ws = w.sheets["Prestamos"]
+
+        # Mapa encabezado -> letra de columna
+        header_to_col_letter = {cell.value: cell.column_letter for cell in ws[1]}
+
+        # Columnas a formatear (numéricas)
+        targets = ["MONTO TOTAL", "MONTO DE AMORTIZACIÓN"] + month_cols
+
+        for header in targets:
+            col_letter = header_to_col_letter.get(header)
+            if not col_letter:
+                continue
+
+            col_idx = column_index_from_string(col_letter)
+            # Aplica formato a TODA la columna desde fila 2 a max_row
+            for row in ws.iter_rows(
+                min_row=2, max_row=ws.max_row, min_col=col_idx, max_col=col_idx
+            ):
+                cell = row[0]
+                # Si vino como texto por alguna razón, intenta convertir
+                if isinstance(cell.value, str):
+                    try:
+                        cell.value = float(cell.value)
+                    except Exception:
+                        pass
+                if isinstance(cell.value, (int, float)):
+                    cell.number_format = "#,##0.00"
+
+            # Ajuste de ancho
+            ws.column_dimensions[col_letter].width = max(12, len(header) + 2)
+
+        # Autofiltro y panes inmovilizados (ayuda de lectura)
+        ws.auto_filter.ref = ws.dimensions
+        ws.freeze_panes = "A2"
+
+        # ===== Formato en hoja Reporte_Pivot (si existe) =====
+        if "Reporte_Pivot" in w.sheets:
+            ws2 = w.sheets["Reporte_Pivot"]
+            ws2.auto_filter.ref = ws2.dimensions
+            ws2.freeze_panes = "A2"
+            # Formatear todas las columnas numéricas excepto la 1 (DNI)
+            for j, cell in enumerate(ws2[1], start=1):
+                if j == 1:
+                    continue
+                col_letter = cell.column_letter
+                col_idx = column_index_from_string(col_letter)
+                for row in ws2.iter_rows(
+                    min_row=2, max_row=ws2.max_row, min_col=col_idx, max_col=col_idx
+                ):
+                    c = row[0]
+                    if isinstance(c.value, str):
+                        try:
+                            c.value = float(c.value)
+                        except Exception:
+                            pass
+                    if isinstance(c.value, (int, float)):
+                        c.number_format = "#,##0.00"
+                ws2.column_dimensions[col_letter].width = max(
+                    12, len(str(cell.value)) + 2
+                )
 
     return send_file(out_path, as_attachment=True, download_name="Prestamos.xlsx")
 
@@ -400,7 +488,7 @@ def api_listar_prestamos():
     if dni:
         q = q.filter(Empleado.dni == dni)
     data = []
-    for p, e in q.order_by(Prestamo.creado_en.desc()).all():
+    for p, e in q.order_by(Prestamo.creado_en.asc()).all():
         saldo = float(sum(c.monto for c in p.cuotas if c.estado == "Pendiente"))
         data.append(
             {
@@ -721,6 +809,7 @@ def api_cerrar_mes():
 # ==========================
 # APERTURA DE PERIODOS CERRADOS
 # ==========================
+
 
 @prestamos_bp.route("/api/prestamos/aperturar_mes", methods=["POST"])
 def api_aperturar_mes():

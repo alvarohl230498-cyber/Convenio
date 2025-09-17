@@ -977,7 +977,7 @@ def descargar_convenio_pdf(convenio_id):
         return re.sub(r"[^A-Za-z0-9_\-]", "", s)
 
     safe_nombre = _sanitize(e.nombre or "Empleado")
-    filename = f"{firma.isoformat()}_Convenio_Acumulacion_{safe_nombre}_{conv.id}.pdf"
+    filename = f"{firma.isoformat()}_CONVENIO_ACUMULACIÓN_{safe_nombre}_{conv.id}.pdf"
 
     response = send_file(
         BytesIO(pdf),
@@ -1220,7 +1220,7 @@ def adelanto_pdf(empleado_id):
     else:
         fecha_base = sanitize(firma_dt.isoformat())
 
-    fname = f"{fecha_base}_Convenio_Adelanto_{emp.nombre.replace(' ', '_')}.pdf"
+    fname = f"{fecha_base}_CONVENIO_ADELANTO_{emp.nombre.replace(' ', '_')}.pdf"
     # =========================================================
 
     return send_file(

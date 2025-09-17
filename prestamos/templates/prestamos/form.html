@@ -354,6 +354,11 @@
 </div>
 
 <script>
+    // ======= SOLO FORMATEO DE MILES/DECIMALES =======
+    const NF2 = new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const money = n => NF2.format(Number(n || 0));
+    // ================================================
+
     let dlgEmpModal, dlgAmortModal, dlgCronoModal;
 
     // Edición previa del cronograma
@@ -444,7 +449,7 @@
         document.getElementById('anio_grati_desde').disabled = !cb.checked;
     }
     function val(v) { return (v === undefined || v === null) ? '' : String(v).trim(); }
-    function dinero(n) { return Number(n || 0).toFixed(2); }
+    function dinero(n) { return money(n); }
 
     function getForm() {
         const fd = new FormData(document.getElementById('frm'));
@@ -483,7 +488,7 @@
     function updatePrevTotal() {
         const total = (cronogramaEdit || []).reduce((s, x) => s + Number(x.monto || 0), 0);
         const t = document.getElementById('cronoPrevTotal');
-        if (t) t.textContent = dinero(total);
+        if (t) t.textContent = money(total);
     }
 
     function toggleEdicion() {
@@ -562,7 +567,7 @@
         document.getElementById('cronogramaCard').classList.remove('d-none');
     }
 
-    // ====== Resto de funciones (sin cambios) ======
+    // ====== Resto de funciones (sin cambios salvo formato visual de montos) ======
 
     async function buscarEmpleado() { /* igual que ya tienes */
         const dni = document.getElementById('dni').value.trim();
@@ -668,8 +673,8 @@
         js.forEach(p => {
             rows.push(`<tr>
         <td>${p.id}</td><td>${p.dni}</td><td>${p.nombre}</td><td>${p.tipo}</td>
-        <td class="text-end">${p.monto_total.toFixed(2)}</td>
-        <td class="text-end">${p.saldo_pendiente.toFixed(2)}</td>
+        <td class="text-end">${money(p.monto_total)}</td>
+        <td class="text-end">${money(p.saldo_pendiente)}</td>
         <td>${p.estado}</td>
         <td class="d-flex gap-2">
             <button class="btn btn-sm btn-outline-info" onclick="verCronograma(${p.id})">Consultar</button>
@@ -702,7 +707,7 @@
             if (!r.ok) throw new Error(js.error || 'No se pudo obtener el saldo');
 
             const saldo = Number(js.saldo ?? 0);
-            // Prefija el monto con el saldo
+            // Prefija el monto con el saldo (input numérico: dejamos .toFixed)
             inputMonto.value = saldo.toFixed(2);
 
             // Opcional: evita exceder saldo
@@ -751,15 +756,15 @@
             document.getElementById('dlgCronoLabel').textContent = `Cronograma de cuotas – Préstamo #${js.id}`;
             document.getElementById('cronoMeta').innerHTML =
                 `<b>DNI:</b> ${js.dni} &nbsp;|&nbsp; <b>Nombre:</b> ${js.nombre} &nbsp;|&nbsp; ` +
-                `<b>Tipo:</b> ${js.tipo} &nbsp;|&nbsp; <b>Monto total:</b> S/ ${js.monto_total.toFixed(2)} &nbsp;|&nbsp; ` +
-                `<b>Saldo:</b> S/ ${js.saldo_pendiente.toFixed(2)}`;
+                `<b>Tipo:</b> ${js.tipo} &nbsp;|&nbsp; <b>Monto total:</b> S/ ${money(js.monto_total)} &nbsp;|&nbsp; ` +
+                `<b>Saldo:</b> S/ ${money(js.saldo_pendiente)}`;
             const body = document.getElementById('cronoBody');
             body.innerHTML = js.cuotas.map(c => `
             <tr>
                 <td>${c.orden}</td>
                 <td>${c.etiqueta}${c.es_grati ? ' <span class="badge text-bg-info">Gratificación</span>' : ''}</td>
                 <td>${c.fecha_cobro}</td>
-                <td class="text-end">${Number(c.monto).toFixed(2)}</td>
+                <td class="text-end">${money(c.monto)}</td>
                 <td>${c.estado}</td>
                 <td>${c.fecha_descuento_real || ''}</td>
             </tr>
@@ -802,7 +807,7 @@
             alert(
                 `Cierre OK\n` +
                 `Cuotas cerradas: ${js.cerradas}\n` +
-                `Monto total: S/ ${Number(js.monto).toFixed(2)}\n` +
+                `Monto total: S/ ${money(js.monto)}\n` +
                 `Préstamos cancelados: ${js.prestamos_cancelados}\n` +
                 `Préstamos parciales: ${js.prestamos_parciales}`
             );
