@@ -367,6 +367,38 @@
     let cronogramaEdit = null;   // arreglo con cuotas generadas/ajustadas
     let edicionActiva = false;   // bandera para inputs editables
 
+    // ===== Normalizador reutilizable para inputs en mayúsculas =====
+    function normalizarTexto(s) {
+        return (s || '')
+            .replace(/[\r\n\t]+/g, ' ')  // saltos de línea y tabs -> espacio
+            .replace(/\s{2,}/g, ' ')     // colapsa espacios múltiples
+            .trim()
+            .toUpperCase();
+    }
+    function wireUpperNormalized(el) {
+        if (!el) return;
+        // Al pegar: reemplaza por versión normalizada
+        el.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const txt = (e.clipboardData || window.clipboardData).getData('text');
+            el.value = normalizarTexto(txt);
+        });
+        // Al escribir: mantiene limpio (sin romper el caret de forma perceptible)
+        el.addEventListener('input', (e) => {
+            const val = e.target.value;
+            const norm = normalizarTexto(val);
+            if (val !== norm) {
+                const pos = e.target.selectionEnd;
+                e.target.value = norm;
+                // restaura el caret al final (suficiente para inputs cortos)
+                e.target.setSelectionRange(norm.length, norm.length);
+            }
+        });
+        // Estilo visual por si llega texto ya en minúsculas
+        el.style.textTransform = 'uppercase';
+        el.autocomplete = 'off';
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         dlgEmpModal = new bootstrap.Modal(document.getElementById('dlgEmp'));
         dlgAmortModal = new bootstrap.Modal(document.getElementById('dlgAmort'));
@@ -376,21 +408,12 @@
         // Cargar por defecto: últimos 20
         buscarPrestamos();
 
-        // === Mejoras del modal Crear colaborador ===
-        const toUpperLive = (el) => {
-            if (!el) return;
-            const up = () => { el.value = (el.value || '').toUpperCase(); };
-            el.addEventListener('input', up);
-            el.addEventListener('paste', (e) => {
-                e.preventDefault();
-                const txt = (e.clipboardData || window.clipboardData).getData('text');
-                el.value = (txt || '').toUpperCase();
-            });
-        };
-        toUpperLive(document.getElementById('e_nombre'));
-        toUpperLive(document.getElementById('e_cargo'));
-        toUpperLive(document.getElementById('e_direccion'));
+        // === Mejoras del modal Crear colaborador (Nombre/Cargo/Dirección) ===
+        wireUpperNormalized(document.getElementById('e_nombre'));
+        wireUpperNormalized(document.getElementById('e_cargo'));
+        wireUpperNormalized(document.getElementById('e_direccion'));
 
+        // Permitir pegar fechas en distintos formatos (dd/mm/aaaa, ddmmyyyy, etc.)
         const efi = document.getElementById('e_fi');
         function parseDateLoose(str) {
             if (!str) return null;
@@ -643,8 +666,6 @@
         const r = await fetch(url);
         let js = [];
         try { js = await r.json(); } catch { js = []; }
-
-
 
         // Subtotales
         const subtotalMonto = js.reduce((s, p) => s + Number(p.monto_total || 0), 0);
@@ -900,4 +921,5 @@
         }
     }
 </script>
+
 {% endblock %}
